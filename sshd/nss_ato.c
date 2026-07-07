@@ -26,15 +26,20 @@ static int copy_str(const char *src, char **dst, char **buf, size_t *left)
 enum nss_status _nss_ato_getpwnam_r(const char *name, struct passwd *result,
                                     char *buffer, size_t buflen, int *errnop)
 {
-    struct passwd *tpl = NULL;
+    struct passwd tplbuf, *tpl = NULL, *ent = NULL;
+    char tplstr[1024];
     FILE *f = fopen("/etc/passwd", "re");
     if (f == NULL) {
         *errnop = errno;
         return NSS_STATUS_UNAVAIL;
     }
-    while ((tpl = fgetpwent(f)) != NULL)
-        if (strcmp(tpl->pw_name, "blog") == 0)
+    /* fgetpwent_r: _r entry points must be reentrant */
+    while (fgetpwent_r(f, &tplbuf, tplstr, sizeof(tplstr), &ent) == 0) {
+        if (strcmp(ent->pw_name, "blog") == 0) {
+            tpl = ent;
             break;
+        }
+    }
     if (tpl == NULL) {
         fclose(f);
         *errnop = ENOENT;

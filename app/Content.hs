@@ -10,6 +10,7 @@ module Content
   , plainListing
   ) where
 
+import Control.Applicative ((<|>))
 import Data.Aeson (FromJSON (..), withObject, (.!=), (.:), (.:?))
 import Data.ByteString (ByteString)
 import Data.FileEmbed (embedDir, embedFile)
@@ -20,7 +21,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Yaml as Yaml
 
--- Mirrors PostMetadata in src/lib/content.ts
+-- mirror PostMetadata (src/lib/content.ts)
 data Meta = Meta
   { mTitle :: Text
   , mDate :: Text
@@ -47,19 +48,23 @@ data Post = Post
   , postBody :: Text
   }
 
--- Content is baked into the binary at compile time; rebuilding the image
--- after editing content is the whole deployment story.
 postFiles :: [(FilePath, ByteString)]
 postFiles = $(embedDir "../src/content/posts")
 
 allPosts :: [Post]
 allPosts =
-  sortOn (Down . postDate) -- ISO dates, so lexical sort is chronological
+  sortOn (Down . postDate) -- ISO; lexical sort is chronological
     [p | (path, raw) <- postFiles, ".md" `isSuffixOf` path, Just p <- [toPost path raw]]
 
 toPost :: FilePath -> ByteString -> Maybe Post
 toPost path raw = do
-  (meta, body) <- parseFrontmatter (TE.decodeUtf8Lenient raw)
+  -- Loud failure over a silently missing post; the Dockerfile smoke-run
+  -- surfaces this at image build time.
+  (meta, body) <-
+    maybe
+      (error ("kio-tui: bad/missing frontmatter in posts/" <> path))
+      Just
+      (parseFrontmatter (TE.decodeUtf8Lenient raw))
   if mDraft meta
     then Nothing
     else
@@ -73,33 +78,29 @@ toPost path raw = do
           , postBody = body
           }
 
--- The about/etc pages (AboutMetadata / EtcMetadata in src/lib/content.ts).
 data PageContent = PageContent
   { pcTitle :: [Text]
   , pcBody :: Text
   }
 
-newtype AboutMeta = AboutMeta [Text]
+-- page frontmatter title: a list of lines or a single string
+newtype PageTitle = PageTitle [Text]
 
-instance FromJSON AboutMeta where
-  parseJSON = withObject "about frontmatter" $ \o -> AboutMeta <$> o .: "title"
-
-newtype TitleMeta = TitleMeta Text
-
-instance FromJSON TitleMeta where
-  parseJSON = withObject "page frontmatter" $ \o -> TitleMeta <$> o .: "title"
+instance FromJSON PageTitle where
+  parseJSON = withObject "page frontmatter" $ \o -> do
+    v <- o .: "title"
+    PageTitle <$> (parseJSON v <|> ((: []) <$> parseJSON v))
 
 aboutPage :: PageContent
-aboutPage =
-  case parseFrontmatter (TE.decodeUtf8Lenient $(embedFile "../src/content/about.md")) of
-    Just (AboutMeta t, body) -> PageContent t body
-    Nothing -> PageContent ["kio.dev"] ""
+aboutPage = page $(embedFile "../src/content/about.md") ["kio.dev"]
 
 etcPage :: PageContent
-etcPage =
-  case parseFrontmatter (TE.decodeUtf8Lenient $(embedFile "../src/content/etc.md")) of
-    Just (TitleMeta t, body) -> PageContent [t] body
-    Nothing -> PageContent ["Et cetera"] ""
+etcPage = page $(embedFile "../src/content/etc.md") ["Et cetera"]
+
+page :: ByteString -> [Text] -> PageContent
+page raw fallback = case parseFrontmatter (TE.decodeUtf8Lenient raw) of
+  Just (PageTitle t, body) -> PageContent t body
+  Nothing -> PageContent fallback ""
 
 parseFrontmatter :: FromJSON meta => Text -> Maybe (meta, Text)
 parseFrontmatter t = case T.lines t of
@@ -110,11 +111,11 @@ parseFrontmatter t = case T.lines t of
           Left _ -> Nothing
   _ -> Nothing
 
--- Fallback for connections without a pty (e.g. `ssh host < /dev/null`).
+-- fall back for connections w/out pty (e.g. `ssh host < /dev/null`)
 plainListing :: [Post] -> Text
 plainListing ps =
   T.unlines $
-    "kio.dev · posts (connect with a terminal for the interactive version)"
+    "kio.dev · posts (connect with a terminal for interactive)"
       : ""
       : concatMap entry ps
  where

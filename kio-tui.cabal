@@ -9,6 +9,10 @@ executable kio-tui
   hs-source-dirs:   app
   other-modules:
     Content
+    Core
+    Draw
+    Events
+    Fx
     Markdown
     UI
   default-language: GHC2021

@@ -2,7 +2,14 @@ IMAGE := kio-ssh
 NAME  := kio-ssh
 PORT  := 2222
 
-.PHONY: build run start stop ssh
+.PHONY: build run start stop ssh dev
+
+# Rebuild and run in the foreground. Signal forwarding into containers
+# is unreliable, so the trap force-removes the container on Ctrl+C
+# regardless of whether sshd saw the signal.
+dev: build
+	@trap 'docker rm -f $(NAME)-dev >/dev/null 2>&1' EXIT INT TERM; \
+	docker run --rm --init --name $(NAME)-dev $(LIMITS) -p $(PORT):22 -v kio-ssh-keys:/etc/ssh/keys $(IMAGE) || true
 
 # Build context is the repo root (image embeds src/content).
 build:

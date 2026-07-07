@@ -12,11 +12,16 @@ COPY ssh/app app
 # cabal install builds from an sdist copy, which breaks the relative
 # ../src/content embed paths -- build in place instead.
 RUN cabal build exe:kio-tui && cp "$(cabal list-bin kio-tui)" /out/kio-tui
+# Non-tty run prints the plain listing, forcing every post's frontmatter
+# parse -- fails the image build (not a visitor's session) on a bad post.
+RUN /out/kio-tui </dev/null >/dev/null
 
 FROM debian:bookworm-slim
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-    openssh-server libgmp10 libtinfo6 ncurses-base \
+    # ncurses-term: terminfo for modern terminals (kitty, ghostty,
+    # alacritty, wezterm, foot, ...) that ncurses-base lacks
+    openssh-server libgmp10 libtinfo6 ncurses-base ncurses-term \
   && rm -rf /var/lib/apt/lists/* \
   # ForceCommand runs through the user's shell, so it must be a real one
   && useradd -m -s /bin/sh blog \

@@ -1,0 +1,168 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+-- Visual fx: logo renderer, text scramble-in.
+module Fx
+  ( logoArt
+  , logoW
+  , miniLogoArt
+  , glitchWidget
+  , glitchRule
+  , burstText
+  , burstWrap
+  , wrapLines
+  ) where
+
+import Brick
+import Data.List (groupBy)
+import Data.Text (Text)
+import qualified Data.Text as T
+import Lens.Micro ((^.))
+
+import Core
+
+logoArt :: [Text]
+logoArt =
+  [ "+@@@@@@@@@*"
+  , " =@@@@@@@@@%."
+  , "  :@@@@@@@@@@-"
+  , "   .%@@@@@@@@@@@@@@@@@@@@@@@@="
+  , "     #@@@@@@@@@@@@@@@@@@@@@@@@*"
+  , "      .......-@@@@@@@@@@@@@@@@@%."
+  , "       .......:@@@@@@@@@@@@@@@@@@:"
+  , "     *@@@@@@@@@*.......:%@@@@@@@@@"
+  , "   .%@@@@@@@@@=          *@@@@@@%."
+  , "  -@@@@@@@@@@:            +@@@@#"
+  , " =@@@@@@@@@%.              -@@*"
+  , "+@@@@@@@@@#                 .:    :::::::::."
+  , "        :@%.                    .%@@@@@@@@@="
+  , "       -@@@@:                  :@@@@@@@@@@-"
+  , "      +@@@@@@=                =@@@@@@@@@%."
+  , "     #@@@@@@@@*              *@@@@@@@@@#"
+  , "     +@@@@@@@@@#-::::::::::-#@@@@@@@@@+"
+  , "      -@@@@@@@@=+@@@@@@@@@@@@:"
+  , "       .%@@@@@:  -@@@@@@@@@@@@="
+  , "        .#@@%.    .%@@@@@@@@@@@*"
+  , "          +*        #@@@@@@@@@@@*"
+  ]
+
+logoW :: Int
+logoW = 44
+
+miniLogoArt :: [Text]
+miniLogoArt =
+  [ "+@@%-"
+  , "  :@@@@@="
+  , " .%@   %@."
+  , "+@.    *"
+  , " *@@.  .%@="
+  , "  .@@@@@="
+  ]
+
+-- deterministic per-cell noise for all flicker in the app
+noise :: Int -> Int -> Int -> Int -> Int
+noise a b t m = (a * 7919 + b * 104729 + t * 31337) `mod` m
+
+-- art rendered with state's tick/energy driving the glitch
+glitchWidget :: [Text] -> St -> Maybe (Int, Int, Int) -> Widget Name
+glitchWidget art s ripple =
+  vBox
+    [ hBox [withAttr a (txt t) | (a, t) <- row]
+    | row <- glitchArt art (stTick s) (stEnergy s) ripple
+    ]
+
+-- render text that scrambles-in while its burst target is active
+burstText :: St -> BurstTarget -> Int -> AttrName -> Text -> Widget Name
+burstText s target seed a t = case burstAge s target of
+  Just (age, salt) -> scramble (seed + salt * 17) age a t
+  Nothing -> withAttr a (txt t)
+
+-- burstText that word-wraps to the available width (for titles that
+-- can exceed narrow terminals)
+burstWrap :: St -> BurstTarget -> Int -> AttrName -> Text -> Widget Name
+burstWrap s target seed a t =
+  Widget Greedy Fixed $ do
+    ctx <- getContext
+    let ls = wrapLines (max 8 (ctx ^. availWidthL)) t
+    render . vBox $ case burstAge s target of
+      Just (age, salt) -> [scramble (seed + salt * 17 + j) age a l | (j, l) <- zip [0 ..] ls]
+      Nothing -> [withAttr a (txt l) | l <- ls]
+
+-- greedy word-wrap; wide chars count as 1 (fine for prose)
+wrapLines :: Int -> Text -> [Text]
+wrapLines w = go . T.words
+ where
+  go [] = [" "]
+  go ws =
+    let (line, rest) = fitLine [] 0 ws
+     in T.unwords (reverse line) : if null rest then [] else go rest
+  fitLine acc _ [] = (acc, [])
+  fitLine acc len (x : xs)
+    | null acc = fitLine [x] (T.length x) xs
+    | len + 1 + T.length x <= w = fitLine (x : acc) (len + 1 + T.length x) xs
+    | otherwise = (acc, x : xs)
+
+-- glitchy render: deterministic per-cell noise keyed on tick swaps
+-- chars and occasionally runs a cell 'hot'. Interaction raises the
+-- rate; clicking scrambles an expanding ring
+glitchArt :: [Text] -> Int -> Double -> Maybe (Int, Int, Int) -> [[(AttrName, Text)]]
+glitchArt art tick energy ripple =
+  [ runs [cell x y c | (x, c) <- zip [0 ..] (T.unpack row)]
+  | (y, row) <- zip [0 ..] art
+  ]
+ where
+  inRipple x y = case ripple of
+    Nothing -> False
+    Just (rx, ry, t0) ->
+      let age = fromIntegral (tick - t0) :: Double
+          dx = fromIntegral (x - rx)
+          dy = fromIntegral (y - ry) * 2 -- char cells are ~2:1
+          d = sqrt (dx * dx + dy * dy)
+       in abs (d - age * 2.2) < 2.2
+  cell x y c
+    | c == ' ' =
+        if inRipple x y && hash x y < 25
+          then (logoMidAttr, '·')
+          else (metaAttr, ' ')
+    | otherwise =
+        let h = hash x y
+            gp = 6 + round (energy * 28) + (if inRipple x y then 55 else 0)
+            c' = if h < gp then glitch !! (h `mod` length glitch) else c
+            a
+              | inRipple x y && h < 30 = logoHotAttr
+              | h < 2 + round (energy * 6) = logoHotAttr
+              | c' `elem` ("@%Pqbd█▛▜▙▟▀▄▌▐▘▝▖▗▚▞" :: String) = logoDenseAttr
+              | c' `elem` ("#*+=" :: String) = logoMidAttr
+              | otherwise = metaAttr
+         in (a, c')
+  hash x y = noise x y (tick `div` 2) 101
+  glitch = "%#*-=:@" :: String
+
+-- group same-attr cells into single txt widgets per run
+runs :: [(AttrName, Char)] -> [(AttrName, Text)]
+runs = map (\g -> (fst (head g), T.pack (map snd g))) . groupBy (\a b -> fst a == fst b)
+
+-- horizontal rule that drops the occasional stitch
+glitchRule :: Int -> Double -> Widget Name
+glitchRule tick energy =
+  Widget Greedy Fixed $ do
+    ctx <- getContext
+    let w = ctx ^. availWidthL
+        ch x =
+          let h = noise x 0 (tick `div` 4) 211
+           in if h < 2 + round (energy * 12)
+                then (if even h then '┄' else '╌')
+                else '─'
+    render (withAttr metaAttr (txt (T.pack (map ch [0 .. w - 1]))))
+
+-- scramble-in: text resolves over burstFrames ticks
+scramble :: Int -> Int -> AttrName -> Text -> Widget Name
+scramble seed age baseAttr t =
+  hBox [withAttr a (txt r) | (a, r) <- runs cells]
+ where
+  cells =
+    [ if hit then (logoHotAttr, "%#*=:@" !! (h `mod` 6)) else (baseAttr, c)
+    | (i, c) <- zip [0 ..] (T.unpack t)
+    , let h = noise i seed age 101
+          thr = [88, 55, 30, 12, 4] !! min age 4
+          hit = h < thr && c /= ' '
+    ]

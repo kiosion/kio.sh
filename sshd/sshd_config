@@ -18,10 +18,10 @@ PubkeyAuthentication no
 KbdInteractiveAuthentication no
 
 # No shell, no tunnels, no forwarding -- just the TUI.
+# DisableForwarding covers X11, agent, TCP, *and* StreamLocal (unix
+# sockets), which the individual Allow* options miss.
 ForceCommand /usr/local/bin/kio-tui
-X11Forwarding no
-AllowAgentForwarding no
-AllowTcpForwarding no
+DisableForwarding yes
 PermitTunnel no
 PermitUserRC no
 
