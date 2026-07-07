@@ -11,7 +11,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Formatting + lint gate. Prebuilt actions, so no GHC/cabal toolchain needed.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: haskell-actions/run-ormolu@v17
+        with:
+          pattern: app/**/*.hs
+      - uses: haskell-actions/hlint-setup@v2
+      - uses: haskell-actions/hlint-run@v2
+        with:
+          path: app/
+          fail-on: warning
+
   build:
+    needs: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
