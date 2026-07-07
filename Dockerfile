@@ -5,9 +5,14 @@ COPY kio-tui.cabal ./
 RUN cabal update && (cabal build --only-dependencies || true)
 COPY sshd/nss_ato.c ./
 RUN mkdir -p /out && gcc -shared -fPIC -O2 -o /out/libnss_ato.so.2 nss_ato.c
-# Content's source of truth is kio.dev; pull just src/content at build time.
+# git for the clone below, in its own layer so it stays cached across content
+# changes (only the clone layer busts).
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
-  && rm -rf /var/lib/apt/lists/* \
+  && rm -rf /var/lib/apt/lists/*
+# Pull src/content from kio.dev at build. CONtent_REF prevents only this layer
+# from being cached if changed.
+ARG CONTENT_REF=latest
+RUN echo "content ref: $CONTENT_REF" \
   && git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/kiosion/kio.dev.git /tmp/kio.dev \
   && git -C /tmp/kio.dev sparse-checkout set src/content \

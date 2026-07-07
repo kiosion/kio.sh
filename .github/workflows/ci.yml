@@ -5,7 +5,6 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
-  # kio.dev fires this when src/content changes (content is cloned at build)
   repository_dispatch:
     types: [content-updated]
 
@@ -29,8 +28,8 @@ jobs:
           # advisory only: hlint's warnings/suggestions are nits, not bugs
           fail-on: error
 
-  # Smoke build on PRs: the Dockerfile's non-tty run parses every post's
-  # frontmatter, so a bad post or compile error fails here before merge.
+  # Smoke-test on PRs: the Dockerfile's non-tty run parses every post;
+  # a bad post or compile error fails here.
   build:
     needs: lint
     if: github.event_name == 'pull_request'
@@ -47,7 +46,7 @@ jobs:
           cache-to: type=gha,scope=kio-ssh,mode=max
 
   # Deploy on main pushes + content updates. Fly's remote builder rebuilds the
-  # image (pulling the latest content), so this doubles as the build for main.
+  # image so this doubles as the build for main.
   deploy:
     needs: lint
     if: github.event_name != 'pull_request'
@@ -55,6 +54,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --remote-only
+      - id: content
+        run: echo "ref=$(git ls-remote https://github.com/kiosion/kio.dev.git HEAD | cut -f1)" >> "$GITHUB_OUTPUT"
+      - run: flyctl deploy --remote-only --build-arg CONTENT_REF=${{ steps.content.outputs.ref }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
