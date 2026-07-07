@@ -139,7 +139,7 @@ topBar s v =
                 tabRow s (currentTab v)
               ]
           ],
-      glitchRule (stTick s) (stEnergy s)
+      glitchRule (stTick s)
     ]
 
 -- todo: taken from about.md's closing line; actually add a site meta desc.
@@ -209,13 +209,7 @@ hintBar s v =
           mtxt (" " <> d)
         ]
     segW (_, (lbl, d)) = T.length lbl + 1 + T.length d
-    chunk avail = go [] 0
-      where
-        go acc _ [] = [reverse acc | not (null acc)]
-        go acc len (x : xs)
-          | null acc = go [x] (segW x) xs
-          | len + 3 + segW x <= avail = go (x : acc) (len + 3 + segW x) xs
-          | otherwise = reverse acc : go [x] (segW x) xs
+    chunk avail = greedyGroups segW 3 avail
 
 linkify :: Text -> Widget Name -> Widget Name
 linkify u = clickable (LinkTo u)

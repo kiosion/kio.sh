@@ -32,9 +32,8 @@ handle lastInputRef ev = do
     AppEvent Tick -> tick s
     AppEvent TimeUp -> halt
     _ -> liftIO (getMonotonicTime >>= writeIORef lastInputRef)
-  -- One click per press-release cycle: latch on left-press, clear on
-  -- release (keys clear too, in case a release is lost); the guard
-  -- below swallows the drag repeats terminals send while held.
+  -- Latch left-press, clear on release/key; lets the guard below swallow
+  -- the drag repeats terminals send while the button is held.
   case ev of
     _ | mouseUp ev -> modify (\st -> st {stMouseHeld = False})
     VtyEvent (V.EvKey _ _) -> modify (\st -> st {stMouseHeld = False})
@@ -43,21 +42,19 @@ handle lastInputRef ev = do
   case ev of
     AppEvent Tick -> pure ()
     AppEvent TimeUp -> pure ()
-    -- Ctrl+C / Ctrl+D quit from anywhere; visitors expect them.
+    -- Ctrl+C / Ctrl+D quit from anywhere.
     VtyEvent (V.EvKey (V.KChar 'c') [V.MCtrl]) -> halt
     VtyEvent (V.EvKey (V.KChar 'd') [V.MCtrl]) -> halt
     -- drag repeat while the button is held
     _ | stMouseHeld s, leftClick ev -> pure ()
     -- The "?" overlay swallows the next key/click.
     _ | stHelp s, dismisses ev -> modify (\st -> st {stHelp = False})
-    -- While the link status line is showing, any key press or click
-    -- (not the release half of the click that opened it) dismisses it;
-    -- wheel still scrolls.
+    -- Any key/click dismisses the status line; wheel still scrolls.
     _ | stStatus s /= Nothing, dismisses ev -> dismissStatus s ev
     -- While the "/" prompt is open, all keys go to it.
     VtyEvent (V.EvKey k []) | Just buf <- stPrompt s -> promptKey s buf k
     MouseDown n V.BLeft _ (Location (c, r)) -> clickOn n c r
-    _ | Just d <- scrollDelta ev -> bump bumpWheel >> wheel (stView s) d
+    _ | Just d <- scrollDelta ev -> wheel (stView s) d
     -- brick only turns a click into a MouseDown event when the TOPMOST
     -- extent at that spot is clickable; anything under a viewport gets
     -- shadowed and arrives as a raw vty event instead. Hit-test the
@@ -71,7 +68,6 @@ handle lastInputRef ev = do
     VtyEvent (V.EvMouseUp _ _ _) -> pure ()
     VtyEvent (V.EvMouseDown _ _ _ _) -> pure ()
     VtyEvent vev -> do
-      bump bumpKey
       case hintIdxFor (stView s) vev of
         Just i -> setBurst (BHint i)
         Nothing -> pure ()
@@ -179,24 +175,18 @@ actionable nm = case nm of
 
 clickOn :: Name -> Int -> Int -> EventM Name St ()
 clickOn nm lc lr = case nm of
-  LogoField ->
-    modify (\st -> st {stRipple = Just (lc, lr, stTick st), stEnergy = min 1 (stEnergy st + bumpLogo)})
-  LinkTo u -> bump bumpClick >> linkAction u
-  PostRow i -> bump bumpClick >> zoom listL (modify (listMoveTo i)) >> openSelected
-  TabBtn t -> bump bumpClick >> switchTab t
-  BrandBtn -> bump bumpClick >> toLanding
+  LogoField -> modify (\st -> st {stRipple = Just (lc, lr, stTick st)})
+  LinkTo u -> linkAction u
+  PostRow i -> zoom listL (modify (listMoveTo i)) >> openSelected
+  TabBtn t -> switchTab t
+  BrandBtn -> toLanding
   _ -> pure ()
-
--- Interaction feeds the glitch; idleness starves it.
-bump :: Double -> EventM Name St ()
-bump d = modify (\s -> s {stEnergy = min 1 (stEnergy s + d)})
 
 tick :: St -> EventM Name St ()
 tick s =
   modify $ \st ->
     st
       { stTick = stTick s + 1,
-        stEnergy = stEnergy s * energyDecay,
         stRipple = case stRipple s of
           Just (_, _, t0) | stTick s - t0 > rippleFrames -> Nothing
           r -> r,
@@ -366,7 +356,7 @@ switchTab t =
 
 toLanding :: EventM Name St ()
 toLanding =
-  modify (\s -> s {stView = Landing, stEnergy = 1, stSel = maybe (stSel s) id (currentTab (stView s))})
+  modify (\s -> s {stView = Landing, stSel = maybe (stSel s) id (currentTab (stView s))})
 
 backToList :: EventM Name St ()
 backToList = modify (\s -> s {stView = PageView ThoughtsTab})

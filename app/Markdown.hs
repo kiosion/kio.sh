@@ -8,6 +8,7 @@ module Markdown
     markdownAttrs,
     headingAttr,
     siteBase,
+    greedyGroups,
   )
 where
 
@@ -340,10 +341,16 @@ wrapFrags opts w frags = vBox (map line (greedyWrap (max 8 w) ws))
       _ -> id
 
 greedyWrap :: Int -> [Frag] -> [[Frag]]
-greedyWrap w = go [] 0
+greedyWrap = greedyGroups (\(Frag _ _ t) -> T.length t) 1
+
+-- Greedy line-fill: split items into rows whose total width (each item's
+-- width plus `sep` between them) stays within `limit`. Shared by the
+-- markdown, hint-bar, and plain-text wrappers.
+greedyGroups :: (a -> Int) -> Int -> Int -> [a] -> [[a]]
+greedyGroups width sep limit = go [] 0
   where
     go acc _ [] = [reverse acc | not (null acc)]
-    go acc len (f@(Frag _ _ t) : rest)
-      | null acc = go [f] (T.length t) rest
-      | len + 1 + T.length t <= w = go (f : acc) (len + 1 + T.length t) rest
-      | otherwise = reverse acc : go [f] (T.length t) rest
+    go acc len (x : xs)
+      | null acc = go [x] (width x) xs
+      | len + sep + width x <= limit = go (x : acc) (len + sep + width x) xs
+      | otherwise = reverse acc : go [x] (width x) xs

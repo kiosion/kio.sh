@@ -64,7 +64,6 @@ initialSt user =
       stUser = user,
       stTick = 0,
       stSel = HomeTab,
-      stEnergy = 1,
       stRipple = Nothing,
       stBurst = Nothing,
       stStatus = Nothing,

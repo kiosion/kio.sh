@@ -13,11 +13,6 @@ module Core
     burstFrames,
     tickMicros,
     wheelStep,
-    energyDecay,
-    bumpKey,
-    bumpWheel,
-    bumpClick,
-    bumpLogo,
     rippleFrames,
     descMax,
     fxIdleSecs,
@@ -74,7 +69,6 @@ data St = St
     stUser :: Maybe Text,
     stTick :: Int,
     stSel :: Tab,
-    stEnergy :: Double, -- interaction-fed glitch intensity, decays per tick
     stRipple :: Maybe (Int, Int, Int),
     stBurst :: Maybe (BurstTarget, Int),
     stStatus :: Maybe Text,
@@ -94,7 +88,7 @@ data BurstTarget = BTab Tab | BTitle | BStatus | BHint Int | BPost Int
 listL :: Lens' St (GenericList Name Vec.Vector Post)
 listL = lens stList (\s l -> s {stList = l})
 
--- Tuning: the numbers that shape how the app feels, in one place.
+-- Tuning knobs.
 
 -- cap content column so wide terminals still read like a page
 columnWidth :: Int
@@ -111,14 +105,6 @@ tickMicros = 100000
 -- rows per wheel notch
 wheelStep :: Int
 wheelStep = 3
-
--- glitch energy: per-tick falloff and per-interaction feeds
-energyDecay, bumpKey, bumpWheel, bumpClick, bumpLogo :: Double
-energyDecay = 0.88
-bumpKey = 0.25
-bumpWheel = 0.2
-bumpClick = 0.45
-bumpLogo = 0.5
 
 -- logo click ripple lifetime (ticks)
 rippleFrames :: Int

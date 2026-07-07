@@ -22,6 +22,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 import Lens.Micro ((^.))
+import Markdown (greedyGroups)
 
 -- single source of truth for the logo: ssh/logo.txt (the Dockerfile
 -- also injects it into the HTTP landing page)
@@ -33,24 +34,24 @@ logoW = maximum (0 : map T.length logoArt)
 
 miniLogoArt :: [Text]
 miniLogoArt =
-  [ "+@@%-",
-    "  :@@@@@=",
-    " .%@   %@.",
-    "+@.    *",
-    " *@@.  .%@=",
-    "  .@@@@@="
+  [ " *@%.",
+    "  .*@@@%.",
+    " .%@   @@.",
+    ".@+    * .",
+    " *@%.  .%*",
+    "   %*%@@."
   ]
 
 -- deterministic per-cell noise for all flicker in the app
 noise :: Int -> Int -> Int -> Int -> Int
 noise a b t m = (a * 7919 + b * 104729 + t * 31337) `mod` m
 
--- art rendered with state's tick/energy driving the glitch
+-- logo art with per-tick glitch flicker; clicking scrambles a ripple ring
 glitchWidget :: [Text] -> St -> Maybe (Int, Int, Int) -> Widget Name
 glitchWidget art s ripple =
   vBox
     [ hBox [withAttr a (txt t) | (a, t) <- row]
-    | row <- glitchArt art (stTick s) (stEnergy s) ripple
+    | row <- glitchArt art (stTick s) ripple
     ]
 
 -- render text that scrambles-in while its burst target is active
@@ -72,23 +73,14 @@ burstWrap s target seed a t =
 
 -- greedy word-wrap; wide chars count as 1 (fine for prose)
 wrapLines :: Int -> Text -> [Text]
-wrapLines w = go . T.words
-  where
-    go [] = [" "]
-    go ws =
-      let (line, rest) = fitLine [] 0 ws
-       in T.unwords (reverse line) : if null rest then [] else go rest
-    fitLine acc _ [] = (acc, [])
-    fitLine acc len (x : xs)
-      | null acc = fitLine [x] (T.length x) xs
-      | len + 1 + T.length x <= w = fitLine (x : acc) (len + 1 + T.length x) xs
-      | otherwise = (acc, x : xs)
+wrapLines w t = case greedyGroups T.length 1 w (T.words t) of
+  [] -> [" "]
+  gs -> map T.unwords gs
 
--- glitchy render: deterministic per-cell noise keyed on tick swaps
--- chars and occasionally runs a cell 'hot'. Interaction raises the
--- rate; clicking scrambles an expanding ring
-glitchArt :: [Text] -> Int -> Double -> Maybe (Int, Int, Int) -> [[(AttrName, Text)]]
-glitchArt art tick energy ripple =
+-- deterministic per-cell noise keyed on tick swaps chars and occasionally
+-- runs a cell 'hot'; a click scrambles an expanding ring
+glitchArt :: [Text] -> Int -> Maybe (Int, Int, Int) -> [[(AttrName, Text)]]
+glitchArt art tick ripple =
   [ runs [cell x y c | (x, c) <- zip [0 ..] (T.unpack row)]
   | (y, row) <- zip [0 ..] art
   ]
@@ -108,11 +100,11 @@ glitchArt art tick energy ripple =
             else (metaAttr, ' ')
       | otherwise =
           let h = hash x y
-              gp = 6 + round (energy * 28) + (if inRipple x y then 55 else 0)
+              gp = 6 + (if inRipple x y then 55 else 0)
               c' = if h < gp then glitch !! (h `mod` length glitch) else c
               a
                 | inRipple x y && h < 30 = logoHotAttr
-                | h < 2 + round (energy * 6) = logoHotAttr
+                | h < 2 = logoHotAttr
                 | c' `elem` ("@%Pqbd█▛▜▙▟▀▄▌▐▘▝▖▗▚▞" :: String) = logoDenseAttr
                 | c' `elem` ("#*+=" :: String) = logoMidAttr
                 | otherwise = metaAttr
@@ -125,14 +117,14 @@ runs :: [(AttrName, Char)] -> [(AttrName, Text)]
 runs = map (\g -> (fst (head g), T.pack (map snd g))) . groupBy (\a b -> fst a == fst b)
 
 -- horizontal rule that drops the occasional stitch
-glitchRule :: Int -> Double -> Widget Name
-glitchRule tick energy =
+glitchRule :: Int -> Widget Name
+glitchRule tick =
   Widget Greedy Fixed $ do
     ctx <- getContext
     let w = ctx ^. availWidthL
         ch x =
           let h = noise x 0 (tick `div` 4) 211
-           in if h < 2 + round (energy * 12)
+           in if h < 2
                 then (if even h then '┄' else '╌')
                 else '─'
     render (withAttr metaAttr (txt (T.pack (map ch [0 .. w - 1]))))
