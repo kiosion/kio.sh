@@ -14,6 +14,7 @@ import Data.ByteString qualified as BS
 import Data.ByteString.Char8 qualified as BC
 import Data.IORef (IORef, writeIORef)
 import Data.List (find, findIndex)
+import Data.Maybe (fromMaybe, isJust, maybeToList)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
@@ -49,7 +50,7 @@ handle lastInputRef ev = do
     -- The "?" overlay swallows the next key/click.
     _ | stHelp s, dismisses ev -> modify (\st -> st {stHelp = False})
     -- Any key/click dismisses the status line; wheel still scrolls.
-    _ | stStatus s /= Nothing, dismisses ev -> dismissStatus s ev
+    _ | isJust (stStatus s), dismisses ev -> dismissStatus s ev
     -- While the "/" prompt is open, all keys go to it.
     VtyEvent (V.EvKey k []) | Just buf <- stPrompt s -> promptKey s buf k
     MouseDown n V.BLeft _ (Location (c, r)) -> clickOn n c r
@@ -64,8 +65,8 @@ handle lastInputRef ev = do
         Extent nm (Location (ec, er)) _ : _ -> clickOn nm (c - ec) (r - er)
         [] -> pure ()
     -- Mouse releases and stray buttons shouldn't reach the key handler.
-    VtyEvent (V.EvMouseUp _ _ _) -> pure ()
-    VtyEvent (V.EvMouseDown _ _ _ _) -> pure ()
+    VtyEvent (V.EvMouseUp {}) -> pure ()
+    VtyEvent (V.EvMouseDown {}) -> pure ()
     VtyEvent vev -> do
       case hintIdxFor (stView s) vev of
         Just i -> setBurst (BHint i)
@@ -113,7 +114,7 @@ mouseUp ev = case ev of
 dismisses :: BrickEvent Name Tick -> Bool
 dismisses ev = case ev of
   VtyEvent (V.EvKey _ _) -> True
-  _ -> leftClick ev || scrollDelta ev /= Nothing
+  _ -> leftClick ev || isJust (scrollDelta ev)
 
 dismissStatus :: St -> BrickEvent Name Tick -> EventM Name St ()
 dismissStatus s ev = do
@@ -143,7 +144,7 @@ bumpHit d = modify (\s -> s {stQuery = fmap (fmap (+ d)) (stQuery s), stPing = T
 -- vi-ish: first esc clears an active search, second does the view's esc.
 escOr :: St -> EventM Name St () -> EventM Name St ()
 escOr s act
-  | stQuery s /= Nothing = modify (\st -> st {stQuery = Nothing})
+  | isJust (stQuery s) = modify (\st -> st {stQuery = Nothing})
   | otherwise = act
 
 -- Move the list selection to the next/previous matching post.
@@ -151,10 +152,10 @@ listSearch :: Text -> Int -> EventM Name St ()
 listSearch q dir = do
   s <- get
   let n = length allPosts
-      cur = maybe 0 id (listSelected (stList s))
+      cur = fromMaybe 0 (listSelected (stList s))
       ql = T.toLower q
       matchP p =
-        any (T.isInfixOf ql . T.toLower) (postTitle p : postTags p <> maybe [] (: []) (postDesc p))
+        any (T.isInfixOf ql . T.toLower) (postTitle p : postTags p <> maybeToList (postDesc p))
       found = find (\j -> matchP (allPosts !! j)) [(cur + dir * step) `mod` n | step <- [1 .. n]]
   when (n > 0) $ case found of
     Just j -> listNav (zoom listL (modify (listMoveTo j)))
@@ -223,16 +224,16 @@ viewKey s vev = case stView s of
     _ | Just t <- tabMove vev ThoughtsTab -> switchTab t
     _ -> listNav (zoom listL (handleListEventVi handleListEvent vev))
   PageView t -> case vev of
-    V.EvKey (V.KChar 'n') [] | stQuery s /= Nothing -> bumpHit 1
-    V.EvKey (V.KChar 'N') [] | stQuery s /= Nothing -> bumpHit (-1)
+    V.EvKey (V.KChar 'n') [] | isJust (stQuery s) -> bumpHit 1
+    V.EvKey (V.KChar 'N') [] | isJust (stQuery s) -> bumpHit (-1)
     V.EvKey (V.KChar 'q') [] -> halt
     V.EvKey V.KEsc [] -> escOr s toLanding
     V.EvKey (V.KChar '\t') [] -> switchTab (nextTab t)
     _ | Just t' <- tabMove vev t -> switchTab t'
     _ -> scrollVp (PageView t) vev
   PostView p -> case vev of
-    V.EvKey (V.KChar 'n') [] | stQuery s /= Nothing -> bumpHit 1
-    V.EvKey (V.KChar 'N') [] | stQuery s /= Nothing -> bumpHit (-1)
+    V.EvKey (V.KChar 'n') [] | isJust (stQuery s) -> bumpHit 1
+    V.EvKey (V.KChar 'N') [] | isJust (stQuery s) -> bumpHit (-1)
     V.EvKey (V.KChar 'q') [] -> backToList
     V.EvKey V.KEsc [] -> escOr s backToList
     V.EvKey (V.KChar 'h') [] -> backToList
@@ -257,9 +258,9 @@ tabMove _ _ = Nothing
 -- Run a list movement; highlight the newly selected title if moved
 listNav :: EventM Name St () -> EventM Name St ()
 listNav act = do
-  before <- (listSelected . stList) <$> get
+  before <- listSelected . stList <$> get
   act
-  after <- (listSelected . stList) <$> get
+  after <- listSelected . stList <$> get
   when (before /= after) (maybe (pure ()) (setBurst . BPost) after)
 
 -- which scrollable viewport a view owns
@@ -272,10 +273,10 @@ viewportFor Landing = Nothing
 wheel :: View -> Int -> EventM Name St ()
 wheel v d = case v of
   PageView ThoughtsTab -> listNav (zoom listL (modify (listMoveBy (signum d))))
-  _ -> maybe (pure ()) (\vp -> vScrollBy vp d) (viewportFor v)
+  _ -> maybe (pure ()) (`vScrollBy` d) (viewportFor v)
 
 scrollVp :: View -> V.Event -> EventM Name St ()
-scrollVp v ev = maybe (pure ()) (\vp -> scrollKeys vp ev) (viewportFor v)
+scrollVp v ev = maybe (pure ()) (`scrollKeys` ev) (viewportFor v)
 
 scrollKeys :: ViewportScroll Name -> V.Event -> EventM Name St ()
 scrollKeys vp ev = case ev of
@@ -343,7 +344,7 @@ switchTab t =
 
 toLanding :: EventM Name St ()
 toLanding =
-  modify (\s -> s {stView = Landing, stSel = maybe (stSel s) id (currentTab (stView s))})
+  modify (\s -> s {stView = Landing, stSel = fromMaybe (stSel s) (currentTab (stView s))})
 
 backToList :: EventM Name St ()
 backToList = modify (\s -> s {stView = PageView ThoughtsTab})

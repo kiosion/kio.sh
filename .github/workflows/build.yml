@@ -22,7 +22,9 @@ jobs:
       - uses: haskell-actions/hlint-run@v2
         with:
           path: app/
-          fail-on: warning
+          # advisory only: hlint's warnings/suggestions are nits, not bugs.
+          # only a real hlint error fails the build.
+          fail-on: error
 
   build:
     needs: lint

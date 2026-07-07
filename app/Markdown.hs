@@ -15,6 +15,7 @@ import Brick
 import Brick.Widgets.Border qualified as B
 import CMark
 import Data.List (intersperse, nub, sortOn)
+import Data.Maybe (isNothing)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Graphics.Vty qualified as V
@@ -128,7 +129,7 @@ extractFootnotes src = (T.unlines (replaceRefs table bodyLs), numbered <> extra)
     (bodyLs, defs) = splitDefs (T.lines (T.filter (\c -> c /= fnA && c /= fnB) src))
     table = zip (nub (concat (outsideFences refsInLine bodyLs))) [1 ..]
     numbered = sortOn fst [(n, t) | (lbl, t) <- defs, Just n <- [lookup lbl table]]
-    extra = zip [length table + 1 ..] [t | (lbl, t) <- defs, lookup lbl table == Nothing]
+    extra = zip [length table + 1 ..] [t | (lbl, t) <- defs, isNothing (lookup lbl table)]
 
 splitDefs :: [Text] -> ([Text], [(Text, Text)])
 splitDefs = go False
@@ -143,7 +144,7 @@ splitDefs = go False
            in (b, (lbl, T.strip (T.unwords (txt0 : map T.strip cont))) : ds)
       | otherwise = keep l (go fence rest)
     keep l (b, ds) = (l : b, ds)
-    isCont x = not (T.null (T.strip x)) && defStart x == Nothing && not (isFence x)
+    isCont x = not (T.null (T.strip x)) && isNothing (defStart x) && not (isFence x)
 
 defStart :: Text -> Maybe (Text, Text)
 defStart l = do
@@ -171,7 +172,7 @@ refsInLine t = case T.breakOn "[^" t of
           then []
           else
             let after' = T.drop 1 after
-             in (if T.isPrefixOf ":" after' || T.null lbl then [] else [lbl])
+             in [lbl | not (T.isPrefixOf ":" after' || T.null lbl)]
                   <> refsInLine after'
 
 replaceRefs :: [(Text, Int)] -> [Text] -> [Text]
@@ -311,7 +312,7 @@ fnWord f@(Frag _ _ w) = case T.breakOn (T.singleton fnA) w of
 wrapFrags :: (Ord n) => RenderOpts n -> Int -> [Frag] -> Widget n
 wrapFrags opts w frags = vBox (map line (greedyWrap (max 8 w) ws))
   where
-    ws = map fnWord [Frag a u word | Frag a u t <- frags, word <- T.words t]
+    ws = [fnWord (Frag a u word) | Frag a u t <- frags, word <- T.words t]
     line [] = blank
     line fs = hBox (intersperse (txt " ") (map fragW fs))
     fragW (Frag a mu t) =

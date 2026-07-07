@@ -16,6 +16,7 @@ import Data.Aeson (FromJSON (..), withObject, (.!=), (.:), (.:?))
 import Data.ByteString (ByteString)
 import Data.FileEmbed (embedDir, embedFile)
 import Data.List (isSuffixOf, sortOn)
+import Data.Maybe (fromMaybe)
 import Data.Ord (Down (..))
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -58,6 +59,8 @@ allPosts =
     (Down . postDate) -- ISO; lexical sort is chronological
     [p | (path, raw) <- postFiles, ".md" `isSuffixOf` path, Just p <- [toPost path raw]]
 
+-- the loud error is deliberate here; <|> would read worse
+{- HLINT ignore toPost "Use <|>" -}
 toPost :: FilePath -> ByteString -> Maybe Post
 toPost path raw = do
   -- Loud failure over a silently missing post; the Dockerfile smoke-run
@@ -72,7 +75,7 @@ toPost path raw = do
     else
       Just
         Post
-          { postSlug = maybe (T.pack path) id (T.stripSuffix ".md" (T.pack path)),
+          { postSlug = fromMaybe (T.pack path) (T.stripSuffix ".md" (T.pack path)),
             postTitle = mTitle meta,
             postDate = mDate meta,
             postDesc = mDesc meta,

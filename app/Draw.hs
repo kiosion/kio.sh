@@ -229,7 +229,7 @@ hintBar s v =
           mtxt (" " <> d)
         ]
     segW (_, (lbl, d)) = T.length lbl + 1 + T.length d
-    chunk avail = greedyGroups segW 3 avail
+    chunk = greedyGroups segW 3
 
 linkify :: Text -> Widget Name -> Widget Name
 linkify u = clickable (LinkTo u)

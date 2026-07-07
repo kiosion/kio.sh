@@ -1,11 +1,19 @@
-# kio.dev over SSH
+# kio.sh
 
-As a little easter-egg and fun project, this site's available via SSH at
-`ssh kio.sh`.
+[kio.dev](https://kio.dev), but over SSH — a little easter-egg. My site as a
+terminal app you can just `ssh` into:
 
-Stock OpenSSH does all the crypto/auth/pty work; a tiny NSS module
-(`sshd/nss_ato.c`) maps every username onto the inert `blog` user, whose
-`ForceCommand` is the Haskell TUI using brick.
+```sh
+ssh kio.sh              # interactive
+ssh kio.sh ls           # list posts
+ssh kio.sh cat <slug>   # print one as markdown
+```
+
+Stock OpenSSH handles the crypto, auth, and pty; a tiny NSS module
+(`sshd/nss_ato.c`) maps every username onto one inert `blog` user whose
+`ForceCommand` is the TUI — a Haskell + [brick](https://github.com/jtdaugherty/brick)
+app with the site content baked in at build. Browsers that wander in get an
+HTTP man page instead.
 
 ```text
                 +@@@@@@@@@*
@@ -38,19 +46,14 @@ Stock OpenSSH does all the crypto/auth/pty work; a tiny NSS module
               h/l select · enter open · q quit · ? keys
 ```
 
-## Dev
+## Hacking
 
-Local, without SSH layer (GHC + cabal via ghcup):
-
-```sh
-make content && cabal run kio-tui
-```
-
-Full container:
+Content is the real thing from [kio.dev](https://github.com/kiosion/kio.dev),
+pulled in at build:
 
 ```sh
-make dev                 # build + run fg on :2222, Ctrl+C to stop
-ssh localhost -p 2222    # connect
+make content && cabal run kio-tui   # run it locally, no ssh layer
+make dev                            # or the full container on :2222
 ```
 
 ## To-do

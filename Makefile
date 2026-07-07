@@ -3,7 +3,7 @@ NAME  := kio-ssh
 PORT  := 2222
 HTTP  := 8080
 
-.PHONY: build run start stop ssh dev content
+.PHONY: build run start stop ssh dev content lint
 
 # Pull site content
 content:
@@ -36,3 +36,7 @@ stop:
 
 ssh:
 	ssh -p $(PORT) localhost
+
+# hlint suggestions (same as CI); needs `brew install hlint` or `cabal install hlint`
+lint:
+	hlint app
