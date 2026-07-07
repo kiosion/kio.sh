@@ -7,22 +7,21 @@ module UI (runTui) where
 import Brick
 import Brick.BChan (newBChan, writeBChan)
 import Brick.Widgets.List (list)
+import Content (allPosts)
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Monad (forever, void, when)
+import Core
 import Data.Char (isAlphaNum)
 import Data.IORef (IORef, newIORef, readIORef)
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Vector as Vec
-import GHC.Clock (getMonotonicTime)
-import qualified Graphics.Vty as V
-import qualified Graphics.Vty.CrossPlatform as V (mkVty)
-import System.Environment (lookupEnv)
-
-import Content (allPosts)
-import Core
+import Data.Text qualified as T
+import Data.Vector qualified as Vec
 import Draw (draw)
 import Events (handle)
+import GHC.Clock (getMonotonicTime)
+import Graphics.Vty qualified as V
+import Graphics.Vty.CrossPlatform qualified as V (mkVty)
+import System.Environment (lookupEnv)
 
 runTui :: IO ()
 runTui = do
@@ -54,35 +53,36 @@ sanitizeUser :: String -> Maybe Text
 sanitizeUser name
   | T.null t || t == "blog" = Nothing
   | otherwise = Just t
- where
-  t = T.take 16 (T.filter (\c -> isAlphaNum c || c `elem` ("-_." :: String)) (T.pack name))
+  where
+    t = T.take 16 (T.filter (\c -> isAlphaNum c || c `elem` ("-_." :: String)) (T.pack name))
 
 initialSt :: Maybe Text -> St
 initialSt user =
   St
-    { stList = list PostList (Vec.fromList allPosts) 4
-    , stView = Landing
-    , stUser = user
-    , stTick = 0
-    , stSel = HomeTab
-    , stEnergy = 1
-    , stRipple = Nothing
-    , stBurst = Nothing
-    , stStatus = Nothing
-    , stPrompt = Nothing
-    , stQuery = Nothing
-    , stPing = False
-    , stFnJump = Nothing
-    , stHelp = False
-    , stProgress = Nothing
+    { stList = list PostList (Vec.fromList allPosts) 4,
+      stView = Landing,
+      stUser = user,
+      stTick = 0,
+      stSel = HomeTab,
+      stEnergy = 1,
+      stRipple = Nothing,
+      stBurst = Nothing,
+      stStatus = Nothing,
+      stPrompt = Nothing,
+      stQuery = Nothing,
+      stPing = False,
+      stFnJump = Nothing,
+      stHelp = False,
+      stProgress = Nothing,
+      stMouseHeld = False
     }
 
 app :: IORef Double -> App St Tick Name
 app lastInputRef =
   App
-    { appDraw = draw
-    , appChooseCursor = neverShowCursor
-    , appHandleEvent = handle lastInputRef
-    , appStartEvent = pure ()
-    , appAttrMap = const theMap
+    { appDraw = draw,
+      appChooseCursor = neverShowCursor,
+      appHandleEvent = handle lastInputRef,
+      appStartEvent = pure (),
+      appAttrMap = const theMap
     }

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kio.sh(1)</title>
+<meta name="description" content="NAME: kio.sh — an ssh server · SYNOPSIS: ssh kio.sh · SEE ALSO: kio.dev">
+<link rel="canonical" href="https://kio.sh/">
+<meta name="theme-color" content="#0d0c0c">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230d0c0c'/><text x='8' y='12.5' font-family='monospace' font-size='12' fill='%23affa71' text-anchor='middle'>$</text></svg>">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://kio.sh/">
+<meta property="og:title" content="kio.sh(1)">
+<meta property="og:description" content="NAME: kio.sh — an ssh server · SYNOPSIS: ssh kio.sh · SEE ALSO: kio.dev">
+<meta name="twitter:card" content="summary">
+<link rel="preload" href="/CommitMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+  @font-face {
+    font-family: 'Commit Mono';
+    src: url('/CommitMono-Regular.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Commit Mono';
+    src: url('/CommitMono-Bold.woff2') format('woff2');
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+  }
+  :root {
+    --bg: #0d0c0c; /* color-black */
+    --fg: #e4e0dc; /* neutral-100 */
+    --dim: #595650; /* neutral-400 */
+    --orange: #e03400; /* orange-dark */
+    --green: #affa71; /* accent-dark */
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Commit Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem 3rem;
+  }
+  pre.logo {
+    color: var(--orange);
+    font-size: clamp(6px, 1.6vw, 12px);
+    line-height: 1.15;
+    user-select: none;
+  }
+  .term { margin-top: 2.5rem; }
+  .ps1 { color: var(--green); }
+  .comment { color: var(--dim); }
+  .man { width: min(88vw, 38em); }
+  .manhead { display: flex; justify-content: space-between; }
+  .sect { font-weight: bold; }
+  .ind { padding-left: 3.5em; }
+  .cmd {
+    background: none;
+    border: none;
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+  }
+  .cmd:hover { text-decoration: underline; }
+  .opt { display: inline-block; min-width: 7.5em; text-align: left; }
+  .copied { color: var(--green); }
+  a { color: var(--green); }
+</style>
+</head>
+<body>
+<pre class="logo" aria-hidden="true">
+@LOGO@
+</pre>
+
+<div class="term">
+  <p><span class="ps1">$</span> man kio.sh</p>
+  <br>
+  <div class="man">
+    <p class="manhead"><span>KIO.SH(1)</span><span>User Commands</span><span>KIO.SH(1)</span></p>
+    <br>
+    <p class="sect">NAME</p>
+    <p class="ind">kio.sh — an ssh server. you've reached the http fallback.</p>
+    <br>
+    <p class="sect">SYNOPSIS</p>
+    <p class="ind">
+      <button class="cmd" type="button" title="Copy" data-copy="ssh kio.sh">ssh kio.sh</button>
+      <span class="comment">[command]</span>
+      <span class="comment" id="note"># click to copy</span>
+    </p>
+    <br>
+    <p class="sect">DESCRIPTION</p>
+    <p class="ind">with no command, opens interactive. otherwise:</p>
+    <p class="ind"><button class="cmd opt" type="button" title="Copy" data-copy="ssh kio.sh ls">ls</button>list content</p>
+    <p class="ind"><button class="cmd opt" type="button" title="Copy" data-copy="ssh kio.sh cat ">cat <span class="comment">&lt;slug&gt;</span></button>print content as markdown</p>
+    <br>
+    <p class="sect">SEE ALSO</p>
+    <p class="ind"><a href="https://man.openbsd.org/ssh.1">ssh(1)</a></p>
+    <p class="ind">homepage: <span class="comment">&lt;</span><a href="https://kio.dev">https://kio.dev</a><span class="comment">&gt;</span></p>
+  </div>
+</div>
+
+<script>
+  const note = document.getElementById('note');
+  document.querySelectorAll('.cmd').forEach((b) =>
+    b.addEventListener('click', () => {
+      navigator.clipboard?.writeText(b.dataset.copy).then(() => {
+        note.innerHTML = '<span class="copied"># copied</span>';
+        setTimeout(() => { note.textContent = '# click a command to copy'; }, 1200);
+      });
+    })
+  );
+</script>
+</body>
+</html>

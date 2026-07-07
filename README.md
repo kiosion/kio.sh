@@ -1,7 +1,8 @@
 # kio.dev over SSH
 
 As a little easter-egg and fun project, this site's available via SSH at
-`ssh kio.sh`.
+`ssh kio.sh`. Also scriptable: `ssh kio.sh ls` and
+`ssh kio.sh cat <slug>` (via `SSH_ORIGINAL_COMMAND`).
 
 Stock OpenSSH does all the crypto/auth/pty work; a tiny NSS module
 (`sshd/nss_ato.c`) maps every username onto the inert `blog` user, whose

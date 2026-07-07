@@ -2,21 +2,22 @@
 
 -- Markdown to brick widgets
 module Markdown
-  ( RenderOpts (..)
-  , FnJump (..)
-  , renderMarkdown
-  , markdownAttrs
-  , headingAttr
-  , siteBase
-  ) where
+  ( RenderOpts (..),
+    FnJump (..),
+    renderMarkdown,
+    markdownAttrs,
+    headingAttr,
+    siteBase,
+  )
+where
 
 import Brick
-import qualified Brick.Widgets.Border as B
+import Brick.Widgets.Border qualified as B
 import CMark
 import Data.List (intersperse, nub, sortOn)
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Graphics.Vty as V
+import Data.Text qualified as T
+import Graphics.Vty qualified as V
 import Lens.Micro ((^.))
 
 siteBase :: Text
@@ -27,11 +28,11 @@ data FnJump = JRef Int | JDef Int
   deriving (Eq)
 
 data RenderOpts n = RenderOpts
-  { roLink :: Text -> Widget n -> Widget n
-  , roJump :: Maybe FnJump -- fn jump targets
-  , roQuery :: Maybe Text -- lowercased search query
-  , roHit :: Int -- which match to scroll to
-  , roPing :: Bool -- apply the scroll request this render only
+  { roLink :: Text -> Widget n -> Widget n,
+    roJump :: Maybe FnJump, -- fn jump targets
+    roQuery :: Maybe Text, -- lowercased search query
+    roHit :: Int, -- which match to scroll to
+    roPing :: Bool -- apply the scroll request this render only
   }
 
 plainAttr, headingAttr, codeAttr, emphAttr, strongAttr, linkAttr, quoteAttr, dimAttr, searchAttr :: AttrName
@@ -47,21 +48,21 @@ searchAttr = attrName "md-search"
 
 markdownAttrs :: [(AttrName, V.Attr)]
 markdownAttrs =
-  [ (plainAttr, V.defAttr)
-  , (headingAttr, V.defAttr `V.withStyle` V.bold `V.withForeColor` V.cyan)
-  , (codeAttr, V.defAttr `V.withForeColor` V.yellow)
-  , (emphAttr, V.defAttr `V.withStyle` V.italic)
-  , (strongAttr, V.defAttr `V.withStyle` V.bold)
-  , (linkAttr, V.defAttr `V.withStyle` V.underline `V.withForeColor` V.blue)
-  , (quoteAttr, V.defAttr `V.withForeColor` V.green)
-  , (dimAttr, V.defAttr `V.withStyle` V.dim)
-  , (searchAttr, V.black `on` V.yellow)
+  [ (plainAttr, V.defAttr),
+    (headingAttr, V.defAttr `V.withStyle` V.bold `V.withForeColor` V.cyan),
+    (codeAttr, V.defAttr `V.withForeColor` V.yellow),
+    (emphAttr, V.defAttr `V.withStyle` V.italic),
+    (strongAttr, V.defAttr `V.withStyle` V.bold),
+    (linkAttr, V.defAttr `V.withStyle` V.underline `V.withForeColor` V.blue),
+    (quoteAttr, V.defAttr `V.withForeColor` V.green),
+    (dimAttr, V.defAttr `V.withStyle` V.dim),
+    (searchAttr, V.black `on` V.yellow)
   ]
 
 tshow :: Int -> Text
 tshow = T.pack . show
 
-renderMarkdown :: Ord n => RenderOpts n -> Text -> Widget n
+renderMarkdown :: (Ord n) => RenderOpts n -> Text -> Widget n
 renderMarkdown opts src =
   Widget Greedy Fixed $ do
     ctx <- getContext
@@ -87,29 +88,31 @@ matchesQuery opts t = case roQuery opts of
 -- Which top-level block holds the roHit-th search match.
 activeBlock :: RenderOpts n -> [Node] -> Maybe Int
 activeBlock opts ns = case roQuery opts of
-  Just q | roPing opts, not (T.null q) ->
-    let counts = map (T.count q . T.toLower . nodeText) ns
-        total = sum counts
-     in if total == 0
-          then Nothing
-          else go (roHit opts `mod` total) 0 0 counts
+  Just q
+    | roPing opts,
+      not (T.null q) ->
+        let counts = map (T.count q . T.toLower . nodeText) ns
+            total = sum counts
+         in if total == 0
+              then Nothing
+              else go (roHit opts `mod` total) 0 0 counts
   _ -> Nothing
- where
-  go _ _ _ [] = Nothing
-  go k i acc (c : cs)
-    | acc + c > k = Just i
-    | otherwise = go k (i + 1) (acc + c) cs
+  where
+    go _ _ _ [] = Nothing
+    go k i acc (c : cs)
+      | acc + c > k = Just i
+      | otherwise = go k (i + 1) (acc + c) cs
 
 nodeText :: Node -> Text
 nodeText (Node _ ty ns) = own <> T.concat (map nodeText ns)
- where
-  own = case ty of
-    TEXT t -> t
-    CODE t -> t
-    CODE_BLOCK _ t -> t
-    HTML_BLOCK t -> t
-    HTML_INLINE t -> t
-    _ -> ""
+  where
+    own = case ty of
+      TEXT t -> t
+      CODE t -> t
+      CODE_BLOCK _ t -> t
+      HTML_BLOCK t -> t
+      HTML_INLINE t -> t
+      _ -> ""
 
 -- Sentinels wrapping a ref's number so it survives the CommonMark
 -- parse and can be turned into a clickable sup after.
@@ -126,25 +129,26 @@ isFence = T.isPrefixOf "```" . T.stripStart
 -- source first so every one downstream is ours.
 extractFootnotes :: Text -> (Text, [(Int, Text)])
 extractFootnotes src = (T.unlines (replaceRefs table bodyLs), numbered <> extra)
- where
-  (bodyLs, defs) = splitDefs (T.lines (T.filter (\c -> c /= fnA && c /= fnB) src))
-  table = zip (nub (concat (outsideFences refsInLine bodyLs))) [1 ..]
-  numbered = sortOn fst [(n, t) | (lbl, t) <- defs, Just n <- [lookup lbl table]]
-  extra = zip [length table + 1 ..] [t | (lbl, t) <- defs, lookup lbl table == Nothing]
+  where
+    (bodyLs, defs) = splitDefs (T.lines (T.filter (\c -> c /= fnA && c /= fnB) src))
+    table = zip (nub (concat (outsideFences refsInLine bodyLs))) [1 ..]
+    numbered = sortOn fst [(n, t) | (lbl, t) <- defs, Just n <- [lookup lbl table]]
+    extra = zip [length table + 1 ..] [t | (lbl, t) <- defs, lookup lbl table == Nothing]
 
 splitDefs :: [Text] -> ([Text], [(Text, Text)])
 splitDefs = go False
- where
-  go _ [] = ([], [])
-  go fence (l : rest)
-    | isFence l = keep l (go (not fence) rest)
-    | not fence, Just (lbl, txt0) <- defStart l =
-        let (cont, rest') = span isCont rest
-            (b, ds) = go fence rest'
-         in (b, (lbl, T.strip (T.unwords (txt0 : map T.strip cont))) : ds)
-    | otherwise = keep l (go fence rest)
-  keep l (b, ds) = (l : b, ds)
-  isCont x = not (T.null (T.strip x)) && defStart x == Nothing && not (isFence x)
+  where
+    go _ [] = ([], [])
+    go fence (l : rest)
+      | isFence l = keep l (go (not fence) rest)
+      | not fence,
+        Just (lbl, txt0) <- defStart l =
+          let (cont, rest') = span isCont rest
+              (b, ds) = go fence rest'
+           in (b, (lbl, T.strip (T.unwords (txt0 : map T.strip cont))) : ds)
+      | otherwise = keep l (go fence rest)
+    keep l (b, ds) = (l : b, ds)
+    isCont x = not (T.null (T.strip x)) && defStart x == Nothing && not (isFence x)
 
 defStart :: Text -> Maybe (Text, Text)
 defStart l = do
@@ -155,12 +159,12 @@ defStart l = do
 
 outsideFences :: (Text -> a) -> [Text] -> [a]
 outsideFences f = go False
- where
-  go _ [] = []
-  go fence (l : rest)
-    | isFence l = go (not fence) rest
-    | fence = go fence rest
-    | otherwise = f l : go fence rest
+  where
+    go _ [] = []
+    go fence (l : rest)
+      | isFence l = go (not fence) rest
+      | fence = go fence rest
+      | otherwise = f l : go fence rest
 
 refsInLine :: Text -> [Text]
 refsInLine t = case T.breakOn "[^" t of
@@ -177,45 +181,45 @@ refsInLine t = case T.breakOn "[^" t of
 
 replaceRefs :: [(Text, Int)] -> [Text] -> [Text]
 replaceRefs table = go False
- where
-  go _ [] = []
-  go fence (l : rest)
-    | isFence l = l : go (not fence) rest
-    | fence = l : go fence rest
-    | otherwise = repl l : go fence rest
-  repl t = case T.breakOn "[^" t of
-    (pre, "") -> pre
-    (pre, rest) ->
-      let r = T.drop 2 rest
-          (lbl, after) = T.breakOn "]" r
-       in if T.null after
-            then t
-            else
-              let after' = T.drop 1 after
-               in case lookup lbl table of
-                    Just n
-                      | not (T.isPrefixOf ":" after') ->
-                          pre <> T.singleton fnA <> tshow n <> T.singleton fnB <> repl after'
-                    _ -> pre <> "[^" <> lbl <> "]" <> repl after'
+  where
+    go _ [] = []
+    go fence (l : rest)
+      | isFence l = l : go (not fence) rest
+      | fence = l : go fence rest
+      | otherwise = repl l : go fence rest
+    repl t = case T.breakOn "[^" t of
+      (pre, "") -> pre
+      (pre, rest) ->
+        let r = T.drop 2 rest
+            (lbl, after) = T.breakOn "]" r
+         in if T.null after
+              then t
+              else
+                let after' = T.drop 1 after
+                 in case lookup lbl table of
+                      Just n
+                        | not (T.isPrefixOf ":" after') ->
+                            pre <> T.singleton fnA <> tshow n <> T.singleton fnB <> repl after'
+                      _ -> pre <> "[^" <> lbl <> "]" <> repl after'
 
-footnoteWidgets :: Ord n => RenderOpts n -> Int -> [(Int, Text)] -> [Widget n]
+footnoteWidgets :: (Ord n) => RenderOpts n -> Int -> [(Int, Text)] -> [Widget n]
 footnoteWidgets opts w notes =
   withAttr dimAttr B.hBorder
     : withAttr headingAttr (txt "Footnotes:")
     : [ maybeVis n $
           hBox
-            [ roLink opts ("fnref:" <> tshow n) (withAttr linkAttr (txt (tshow n <> ".")))
-            , txt " "
-            , indented w 4 (\w' -> blocks opts w' (commonmarkToNode [] t))
+            [ roLink opts ("fnref:" <> tshow n) (withAttr linkAttr (txt (tshow n <> "."))),
+              txt " ",
+              indented w 4 (\w' -> blocks opts w' (commonmarkToNode [] t))
             ]
       | (n, t) <- notes
       ]
- where
-  maybeVis n = case roJump opts of
-    Just (JDef m) | m == n -> visible
-    _ -> id
+  where
+    maybeVis n = case roJump opts of
+      Just (JDef m) | m == n -> visible
+      _ -> id
 
-blocks :: Ord n => RenderOpts n -> Int -> Node -> Widget n
+blocks :: (Ord n) => RenderOpts n -> Int -> Node -> Widget n
 blocks opts w (Node _ DOCUMENT ns) = vBox (intersperse blank (map (block opts w) ns))
 blocks opts w n = block opts w n
 
@@ -223,7 +227,7 @@ blocks opts w n = block opts w n
 indented :: Int -> Int -> (Int -> Widget n) -> Widget n
 indented w k f = hLimit (max 8 (w - k)) (f (w - k))
 
-block :: Ord n => RenderOpts n -> Int -> Node -> Widget n
+block :: (Ord n) => RenderOpts n -> Int -> Node -> Widget n
 block opts w (Node _ PARAGRAPH ns) = wrapFrags opts w (inlines ns)
 block opts w (Node _ (HEADING lvl) ns) =
   wrapFrags opts w (Frag headingAttr Nothing (T.replicate lvl "#" <> " ") : map (reattr headingAttr) (inlines ns))
@@ -240,8 +244,8 @@ block opts w (Node _ BLOCK_QUOTE ns) =
     let ht = V.imageHeight (inner ^. imageL)
     render $
       hBox
-        [ withAttr quoteAttr (vBox (replicate (max 1 ht) (txt "│ ")))
-        , Widget Fixed Fixed (pure inner)
+        [ withAttr quoteAttr (vBox (replicate (max 1 ht) (txt "│ "))),
+          Widget Fixed Fixed (pure inner)
         ]
 block opts w (Node _ (LIST attrs) items) =
   vBox (zipWith (listItem opts w attrs) [listStart attrs ..] items)
@@ -249,16 +253,16 @@ block _ _ (Node _ THEMATIC_BREAK _) = B.hBorder
 block _ _ (Node _ (HTML_BLOCK t) _) = withAttr dimAttr (txt (T.strip t))
 block opts w (Node _ _ ns) = vBox (map (block opts w) ns)
 
-listItem :: Ord n => RenderOpts n -> Int -> ListAttributes -> Int -> Node -> Widget n
+listItem :: (Ord n) => RenderOpts n -> Int -> ListAttributes -> Int -> Node -> Widget n
 listItem opts w attrs i (Node _ ITEM ns) =
   hBox
-    [ withAttr dimAttr (txt bullet)
-    , indented w (T.length bullet) (\w' -> vBox (map (block opts w') ns))
+    [ withAttr dimAttr (txt bullet),
+      indented w (T.length bullet) (\w' -> vBox (map (block opts w') ns))
     ]
- where
-  bullet = case listType attrs of
-    BULLET_LIST -> "• "
-    ORDERED_LIST -> T.pack (show i) <> ". "
+  where
+    bullet = case listType attrs of
+      BULLET_LIST -> "• "
+      ORDERED_LIST -> T.pack (show i) <> ". "
 listItem opts w _ _ n = block opts w n
 
 data Frag = Frag AttrName (Maybe Text) Text
@@ -317,29 +321,29 @@ isFnUrl u = T.isPrefixOf "fn:" u || T.isPrefixOf "fnref:" u
 
 -- Greedy wordwrap over attributed fragments. Splitting on whitespace
 -- collapses runs of spaces inside inline code spans; fine for prose
-wrapFrags :: Ord n => RenderOpts n -> Int -> [Frag] -> Widget n
+wrapFrags :: (Ord n) => RenderOpts n -> Int -> [Frag] -> Widget n
 wrapFrags opts w frags = vBox (map line (greedyWrap (max 8 w) ws))
- where
-  ws = map fnWord [Frag a u word | Frag a u t <- frags, word <- T.words t]
-  line [] = blank
-  line fs = hBox (intersperse (txt " ") (map fragW fs))
-  fragW (Frag a mu t) =
-    let a' = if matchesQuery opts t then searchAttr else a
-        w' = withAttr a' (txt t)
-     in case mu of
-          Nothing -> w'
-          Just u
-            | isFnUrl u -> jumpVis u (roLink opts u w')
-            | otherwise -> roLink opts u (hyperlink u w')
-  jumpVis u = case roJump opts of
-    Just (JRef n) | u == "fn:" <> tshow n -> visible
-    _ -> id
+  where
+    ws = map fnWord [Frag a u word | Frag a u t <- frags, word <- T.words t]
+    line [] = blank
+    line fs = hBox (intersperse (txt " ") (map fragW fs))
+    fragW (Frag a mu t) =
+      let a' = if matchesQuery opts t then searchAttr else a
+          w' = withAttr a' (txt t)
+       in case mu of
+            Nothing -> w'
+            Just u
+              | isFnUrl u -> jumpVis u (roLink opts u w')
+              | otherwise -> roLink opts u (hyperlink u w')
+    jumpVis u = case roJump opts of
+      Just (JRef n) | u == "fn:" <> tshow n -> visible
+      _ -> id
 
 greedyWrap :: Int -> [Frag] -> [[Frag]]
 greedyWrap w = go [] 0
- where
-  go acc _ [] = [reverse acc | not (null acc)]
-  go acc len (f@(Frag _ _ t) : rest)
-    | null acc = go [f] (T.length t) rest
-    | len + 1 + T.length t <= w = go (f : acc) (len + 1 + T.length t) rest
-    | otherwise = reverse acc : go [f] (T.length t) rest
+  where
+    go acc _ [] = [reverse acc | not (null acc)]
+    go acc len (f@(Frag _ _ t) : rest)
+      | null acc = go [f] (T.length t) rest
+      | len + 1 + T.length t <= w = go (f : acc) (len + 1 + T.length t) rest
+      | otherwise = reverse acc : go [f] (T.length t) rest

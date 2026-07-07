@@ -5,24 +5,23 @@ module Events (handle) where
 
 import Brick
 import Brick.Widgets.List
+import Content
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
+import Core
 import Data.Bits (shiftL, shiftR, (.&.), (.|.))
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BC
+import Data.ByteString qualified as BS
+import Data.ByteString.Char8 qualified as BC
 import Data.IORef (IORef, writeIORef)
 import Data.List (find, findIndex)
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as TE
 import GHC.Clock (getMonotonicTime)
-import qualified Graphics.Vty as V
+import Graphics.Vty qualified as V
 import Lens.Micro ((^.))
-import Text.Read (readMaybe)
-
-import Content
-import Core
 import Markdown (FnJump (..), siteBase)
+import Text.Read (readMaybe)
 
 -- lastInputRef feeds the tick thread in UI: it pauses fx ticks on idle
 -- sessions and enforces the idle/session-cap disconnects (TimeUp).
@@ -33,12 +32,22 @@ handle lastInputRef ev = do
     AppEvent Tick -> tick s
     AppEvent TimeUp -> halt
     _ -> liftIO (getMonotonicTime >>= writeIORef lastInputRef)
+  -- One click per press-release cycle: latch on left-press, clear on
+  -- release (keys clear too, in case a release is lost); the guard
+  -- below swallows the drag repeats terminals send while held.
+  case ev of
+    _ | mouseUp ev -> modify (\st -> st {stMouseHeld = False})
+    VtyEvent (V.EvKey _ _) -> modify (\st -> st {stMouseHeld = False})
+    _ | leftClick ev -> modify (\st -> st {stMouseHeld = True})
+    _ -> pure ()
   case ev of
     AppEvent Tick -> pure ()
     AppEvent TimeUp -> pure ()
     -- Ctrl+C / Ctrl+D quit from anywhere; visitors expect them.
     VtyEvent (V.EvKey (V.KChar 'c') [V.MCtrl]) -> halt
     VtyEvent (V.EvKey (V.KChar 'd') [V.MCtrl]) -> halt
+    -- drag repeat while the button is held
+    _ | stMouseHeld s, leftClick ev -> pure ()
     -- The "?" overlay swallows the next key/click.
     _ | stHelp s, dismisses ev -> modify (\st -> st {stHelp = False})
     -- While the link status line is showing, any key press or click
@@ -75,15 +84,15 @@ handle lastInputRef ev = do
       mvp <- lookupViewport ReaderVP
       modify (\st -> st {stProgress = fmap pctOf mvp})
     _ -> modify (\st -> st {stProgress = Nothing})
- where
-  -- distance scrolled through the scrollable range: 0% at the top,
-  -- 100% once the last line is on screen
-  pctOf vp =
-    let (_, vh) = vp ^. vpSize
-        (_, ch) = vp ^. vpContentSize
-     in if ch <= vh
-          then 100
-          else min 100 (round (100 * fromIntegral (vp ^. vpTop) / (fromIntegral (ch - vh) :: Double)))
+  where
+    -- distance scrolled through the scrollable range: 0% at the top,
+    -- 100% once the last line is on screen
+    pctOf vp =
+      let (_, vh) = vp ^. vpSize
+          (_, ch) = vp ^. vpContentSize
+       in if ch <= vh
+            then 100
+            else min 100 (round (100 * fromIntegral (vp ^. vpTop) / (fromIntegral (ch - vh) :: Double)))
 
 -- wheel scroll from either the brick or raw-vty mouse encoding
 scrollDelta :: BrickEvent Name Tick -> Maybe Int
@@ -94,12 +103,22 @@ scrollDelta ev = case ev of
   VtyEvent (V.EvMouseDown _ _ V.BScrollUp _) -> Just (-wheelStep)
   _ -> Nothing
 
+leftClick :: BrickEvent Name Tick -> Bool
+leftClick ev = case ev of
+  MouseDown _ V.BLeft _ _ -> True
+  VtyEvent (V.EvMouseDown _ _ V.BLeft _) -> True
+  _ -> False
+
+mouseUp :: BrickEvent Name Tick -> Bool
+mouseUp ev = case ev of
+  MouseUp {} -> True
+  VtyEvent (V.EvMouseUp {}) -> True
+  _ -> False
+
 dismisses :: BrickEvent Name Tick -> Bool
 dismisses ev = case ev of
   VtyEvent (V.EvKey _ _) -> True
-  MouseDown _ V.BLeft _ _ -> True
-  VtyEvent (V.EvMouseDown _ _ V.BLeft _) -> True
-  _ -> scrollDelta ev /= Nothing
+  _ -> leftClick ev || scrollDelta ev /= Nothing
 
 dismissStatus :: St -> BrickEvent Name Tick -> EventM Name St ()
 dismissStatus s ev = do
@@ -176,18 +195,18 @@ tick :: St -> EventM Name St ()
 tick s =
   modify $ \st ->
     st
-      { stTick = stTick s + 1
-      , stEnergy = stEnergy s * energyDecay
-      , stRipple = case stRipple s of
+      { stTick = stTick s + 1,
+        stEnergy = stEnergy s * energyDecay,
+        stRipple = case stRipple s of
           Just (_, _, t0) | stTick s - t0 > rippleFrames -> Nothing
-          r -> r
-      , stBurst = case stBurst s of
+          r -> r,
+        stBurst = case stBurst s of
           Just (_, t0) | stTick s - t0 > burstFrames -> Nothing
-          b -> b
-      , -- scroll requests apply for one render, then release so the
+          b -> b,
+        -- scroll requests apply for one render, then release so the
         -- visitor can scroll freely again
-        stFnJump = Nothing
-      , stPing = False
+        stFnJump = Nothing,
+        stPing = False
       }
 
 setBurst :: BurstTarget -> EventM Name St ()
@@ -199,8 +218,8 @@ key s vev = case vev of
   V.EvKey (V.KChar '?') [] -> modify (\st -> st {stHelp = True})
   V.EvKey (V.KChar '/') [] | notLanding -> openPrompt
   _ -> viewKey s vev
- where
-  notLanding = case stView s of Landing -> False; _ -> True
+  where
+    notLanding = case stView s of Landing -> False; _ -> True
 
 viewKey :: St -> V.Event -> EventM Name St ()
 viewKey s vev = case stView s of
@@ -319,15 +338,15 @@ copyUrl u = do
 -- ponytail: hand-rolled base64 beats a new dependency for one OSC 52 payload
 b64 :: BS.ByteString -> BS.ByteString
 b64 = BC.pack . go . map fromIntegral . BS.unpack
- where
-  alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-  enc n k = alpha !! ((n `shiftR` k) .&. 63)
-  go (a : b : c : r) =
-    let n = a `shiftL` 16 .|. b `shiftL` 8 .|. c :: Int
-     in enc n 18 : enc n 12 : enc n 6 : enc n 0 : go r
-  go [a, b] = let n = a `shiftL` 16 .|. b `shiftL` 8 :: Int in [enc n 18, enc n 12, enc n 6, '=']
-  go [a] = let n = a `shiftL` 16 :: Int in [enc n 18, enc n 12, '=', '=']
-  go [] = []
+  where
+    alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    enc n k = alpha !! ((n `shiftR` k) .&. 63)
+    go (a : b : c : r) =
+      let n = a `shiftL` 16 .|. b `shiftL` 8 .|. c :: Int
+       in enc n 18 : enc n 12 : enc n 6 : enc n 0 : go r
+    go [a, b] = let n = a `shiftL` 16 .|. b `shiftL` 8 :: Int in [enc n 18, enc n 12, enc n 6, '=']
+    go [a] = let n = a `shiftL` 16 :: Int in [enc n 18, enc n 12, '=', '=']
+    go [] = []
 
 readInt :: Text -> Maybe Int
 readInt = readMaybe . T.unpack

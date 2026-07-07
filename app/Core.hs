@@ -2,50 +2,50 @@
 
 -- Shared: widget names, views, app state, theme, and some small pure helpers
 module Core
-  ( Tab (..)
-  , Name (..)
-  , View (..)
-  , Tick (..)
-  , St (..)
-  , BurstTarget (..)
-  , listL
-  , columnWidth
-  , burstFrames
-  , tickMicros
-  , wheelStep
-  , energyDecay
-  , bumpKey
-  , bumpWheel
-  , bumpClick
-  , bumpLogo
-  , rippleFrames
-  , descMax
-  , fxIdleSecs
-  , idleTimeoutSecs
-  , sessionCapSecs
-  , tabs
-  , currentTab
-  , nextTab
-  , prevTab
-  , hintMap
-  , burstAge
-  , titleAttr
-  , metaAttr
-  , activeTabAttr
-  , logoDenseAttr
-  , logoMidAttr
-  , logoHotAttr
-  , theMap
-  ) where
+  ( Tab (..),
+    Name (..),
+    View (..),
+    Tick (..),
+    St (..),
+    BurstTarget (..),
+    listL,
+    columnWidth,
+    burstFrames,
+    tickMicros,
+    wheelStep,
+    energyDecay,
+    bumpKey,
+    bumpWheel,
+    bumpClick,
+    bumpLogo,
+    rippleFrames,
+    descMax,
+    fxIdleSecs,
+    idleTimeoutSecs,
+    sessionCapSecs,
+    tabs,
+    currentTab,
+    nextTab,
+    prevTab,
+    hintMap,
+    burstAge,
+    titleAttr,
+    metaAttr,
+    activeTabAttr,
+    logoDenseAttr,
+    logoMidAttr,
+    logoHotAttr,
+    theMap,
+  )
+where
 
 import Brick
 import Brick.Widgets.List (GenericList, listSelectedAttr)
-import Data.Text (Text)
-import qualified Data.Vector as Vec
-import qualified Graphics.Vty as V
-import Lens.Micro (Lens', lens)
-
 import Content (Post)
+import Data.Text (Text)
+import Data.Vector qualified as Vec
+import Graphics.Vty qualified as V
+import Lens.Micro (Lens', lens)
 import Markdown (FnJump, markdownAttrs)
 
 data Tab = HomeTab | ThoughtsTab | EtcTab
@@ -69,21 +69,22 @@ data View = Landing | PageView Tab | PostView Post
 data Tick = Tick | TimeUp
 
 data St = St
-  { stList :: GenericList Name Vec.Vector Post
-  , stView :: View
-  , stUser :: Maybe Text
-  , stTick :: Int
-  , stSel :: Tab
-  , stEnergy :: Double -- interaction-fed glitch intensity, decays per tick
-  , stRipple :: Maybe (Int, Int, Int)
-  , stBurst :: Maybe (BurstTarget, Int)
-  , stStatus :: Maybe Text
-  , stPrompt :: Maybe Text -- "/" search prompt buffer while typing
-  , stQuery :: Maybe (Text, Int) -- committed search query + active hit
-  , stPing :: Bool -- apply search scroll request this render
-  , stFnJump :: Maybe FnJump -- footnote scroll request
-  , stHelp :: Bool -- "?" keymap overlay showing
-  , stProgress :: Maybe Int -- reader scroll percentage
+  { stList :: GenericList Name Vec.Vector Post,
+    stView :: View,
+    stUser :: Maybe Text,
+    stTick :: Int,
+    stSel :: Tab,
+    stEnergy :: Double, -- interaction-fed glitch intensity, decays per tick
+    stRipple :: Maybe (Int, Int, Int),
+    stBurst :: Maybe (BurstTarget, Int),
+    stStatus :: Maybe Text,
+    stPrompt :: Maybe Text, -- "/" search prompt buffer while typing
+    stQuery :: Maybe (Text, Int), -- committed search query + active hit
+    stPing :: Bool, -- apply search scroll request this render
+    stFnJump :: Maybe FnJump, -- footnote scroll request
+    stHelp :: Bool, -- "?" keymap overlay showing
+    stProgress :: Maybe Int, -- reader scroll percentage
+    stMouseHeld :: Bool -- left button down; swallow drag repeats
   }
 
 -- transient scramble-in fx targets
@@ -159,19 +160,19 @@ hintMap :: View -> [([V.Key], Text, Text)]
 hintMap v = case v of
   PageView ThoughtsTab -> jk : ([V.KEnter], "enter", "read") : hl : common
   PostView _ ->
-    [ jk
-    , ([V.KChar ' ', V.KChar 'b', V.KPageUp, V.KPageDown], "space/b", "page")
-    , ([V.KEsc, V.KChar 'h', V.KLeft], "esc", "back")
-    , search
-    , help
+    [ jk,
+      ([V.KChar ' ', V.KChar 'b', V.KPageUp, V.KPageDown], "space/b", "page"),
+      ([V.KEsc, V.KChar 'h', V.KLeft], "esc", "back"),
+      search,
+      help
     ]
   _ -> jk : hl : common
- where
-  jk = (jkKeys, "j/k", "scroll")
-  hl = (hlKeys, "h/l", "pages")
-  common = [([V.KEsc], "esc", "landing"), ([V.KChar 'q'], "q", "quit"), search, help]
-  search = ([V.KChar '/'], "/", "search")
-  help = ([V.KChar '?'], "?", "keys")
+  where
+    jk = (jkKeys, "j/k", "scroll")
+    hl = (hlKeys, "h/l", "pages")
+    common = [([V.KEsc], "esc", "landing"), ([V.KChar 'q'], "q", "quit"), search, help]
+    search = ([V.KChar '/'], "/", "search")
+    help = ([V.KChar '?'], "?", "keys")
 
 jkKeys, hlKeys :: [V.Key]
 jkKeys = [V.KChar 'j', V.KChar 'k', V.KUp, V.KDown]
@@ -193,12 +194,12 @@ logoHotAttr = attrName "logo-hot"
 theMap :: AttrMap
 theMap =
   attrMap V.defAttr $
-    [ (titleAttr, V.defAttr `V.withStyle` V.bold)
-    , (metaAttr, V.defAttr `V.withStyle` V.dim)
-    , (activeTabAttr, V.defAttr `V.withForeColor` V.cyan `V.withStyle` V.bold `V.withStyle` V.underline)
-    , (listSelectedAttr, V.defAttr `V.withStyle` V.bold)
-    , (logoDenseAttr, V.defAttr `V.withForeColor` V.red)
-    , (logoMidAttr, V.defAttr `V.withForeColor` V.magenta `V.withStyle` V.dim)
-    , (logoHotAttr, V.defAttr `V.withForeColor` V.brightRed `V.withStyle` V.bold)
+    [ (titleAttr, V.defAttr `V.withStyle` V.bold),
+      (metaAttr, V.defAttr `V.withStyle` V.dim),
+      (activeTabAttr, V.defAttr `V.withForeColor` V.cyan `V.withStyle` V.bold `V.withStyle` V.underline),
+      (listSelectedAttr, V.defAttr `V.withStyle` V.bold),
+      (logoDenseAttr, V.defAttr `V.withForeColor` V.red),
+      (logoMidAttr, V.defAttr `V.withForeColor` V.magenta `V.withStyle` V.dim),
+      (logoHotAttr, V.defAttr `V.withForeColor` V.brightRed `V.withStyle` V.bold)
     ]
       <> markdownAttrs

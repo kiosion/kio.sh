@@ -2,7 +2,10 @@
 # The real OpenSSH daemon does all protocol/crypto work; the `blog`
 # account exists only to run the TUI binary.
 
-Port 22
+# Internal port; the edge proxy maps public :22 here. Not 22 itself:
+# Fly's hallpass agent (fly ssh console) must bind :22 on the private
+# IPv6, and sshd holding it crash-loops the machine.
+Port 2222
 HostKey /etc/ssh/keys/ssh_host_ed25519_key
 
 UsePAM no
@@ -16,6 +19,12 @@ PasswordAuthentication yes
 PermitEmptyPasswords yes
 PubkeyAuthentication no
 KbdInteractiveAuthentication no
+
+# Classic credential-stuffing usernames (admin, test, ...) are handled
+# in the TUI binary itself: it prints a one-liner and exits, since the
+# SSH protocol has no message channel on an auth *denial*. root is the
+# exception -- it resolves to uid 0 via real NSS, so PermitRootLogin
+# above must keep hard-denying it.
 
 # No shell, no tunnels, no forwarding -- just the TUI.
 # DisableForwarding covers X11, agent, TCP, *and* StreamLocal (unix
