@@ -1,13 +1,11 @@
 # kio.dev over SSH
 
 As a little easter-egg and fun project, this site's available via SSH at
-`ssh kio.sh`. Also scriptable: `ssh kio.sh ls` and
-`ssh kio.sh cat <slug>` (via `SSH_ORIGINAL_COMMAND`).
+`ssh kio.sh`.
 
 Stock OpenSSH does all the crypto/auth/pty work; a tiny NSS module
 (`sshd/nss_ato.c`) maps every username onto the inert `blog` user, whose
-`ForceCommand` is the Haskell TUI using brick. Site content is embedded into the
-binary at compile.
+`ForceCommand` is the Haskell TUI using brick.
 
 ```text
                 +@@@@@@@@@*
@@ -42,15 +40,13 @@ binary at compile.
 
 ## Dev
 
-Local, no SSH (GHC + cabal via ghcup). `make content` pulls the markdown
-from kio.dev (the source of truth) into `./content` for the compile-time
-embed:
+Local, without SSH layer (GHC + cabal via ghcup):
 
 ```sh
 make content && cabal run kio-tui
 ```
 
-Full container (the image clones `src/content` from kio.dev at build time):
+Full container:
 
 ```sh
 make dev                 # build + run fg on :2222, Ctrl+C to stop
@@ -59,9 +55,6 @@ ssh localhost -p 2222    # connect
 
 ## To-do
 
-- Fly setup: `fly launch --no-deploy`, create the `ssh_keys` volume,
-  allocate a dedicated IPv4, connect the repo (see `fly.toml`)
-- `f`-style link-hint mode so keyboard-only visitors can follow inline links
-- Optional: `makeLenses` for `St` to shrink the record-update lambdas in
-  `Events`
-- Other vi/vim navigation fun-to-have's
+- a11y: `f`-style link-hint mode so keyboard-only visitors can follow inline links
+- try: `makeLenses` for `St` to shrink the record-update lambdas in `Events`
+- other: vi/vim navigation fun-to-have's

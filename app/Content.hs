@@ -2,13 +2,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Content
-  ( Post (..)
-  , PageContent (..)
-  , allPosts
-  , aboutPage
-  , etcPage
-  , plainListing
-  ) where
+  ( Post (..),
+    PageContent (..),
+    allPosts,
+    aboutPage,
+    etcPage,
+    plainListing,
+  )
+where
 
 import Control.Applicative ((<|>))
 import Data.Aeson (FromJSON (..), withObject, (.!=), (.:), (.:?))
@@ -17,17 +18,17 @@ import Data.FileEmbed (embedDir, embedFile)
 import Data.List (isSuffixOf, sortOn)
 import Data.Ord (Down (..))
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
-import qualified Data.Yaml as Yaml
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as TE
+import Data.Yaml qualified as Yaml
 
 -- mirror PostMetadata (src/lib/content.ts)
 data Meta = Meta
-  { mTitle :: Text
-  , mDate :: Text
-  , mDesc :: Maybe Text
-  , mTags :: [Text]
-  , mDraft :: Bool
+  { mTitle :: Text,
+    mDate :: Text,
+    mDesc :: Maybe Text,
+    mTags :: [Text],
+    mDraft :: Bool
   }
 
 instance FromJSON Meta where
@@ -40,12 +41,12 @@ instance FromJSON Meta where
       <*> o .:? "draft" .!= False
 
 data Post = Post
-  { postSlug :: Text
-  , postTitle :: Text
-  , postDate :: Text
-  , postDesc :: Maybe Text
-  , postTags :: [Text]
-  , postBody :: Text
+  { postSlug :: Text,
+    postTitle :: Text,
+    postDate :: Text,
+    postDesc :: Maybe Text,
+    postTags :: [Text],
+    postBody :: Text
   }
 
 postFiles :: [(FilePath, ByteString)]
@@ -53,7 +54,8 @@ postFiles = $(embedDir "content/posts")
 
 allPosts :: [Post]
 allPosts =
-  sortOn (Down . postDate) -- ISO; lexical sort is chronological
+  sortOn
+    (Down . postDate) -- ISO; lexical sort is chronological
     [p | (path, raw) <- postFiles, ".md" `isSuffixOf` path, Just p <- [toPost path raw]]
 
 toPost :: FilePath -> ByteString -> Maybe Post
@@ -70,17 +72,17 @@ toPost path raw = do
     else
       Just
         Post
-          { postSlug = maybe (T.pack path) id (T.stripSuffix ".md" (T.pack path))
-          , postTitle = mTitle meta
-          , postDate = mDate meta
-          , postDesc = mDesc meta
-          , postTags = mTags meta
-          , postBody = body
+          { postSlug = maybe (T.pack path) id (T.stripSuffix ".md" (T.pack path)),
+            postTitle = mTitle meta,
+            postDate = mDate meta,
+            postDesc = mDesc meta,
+            postTags = mTags meta,
+            postBody = body
           }
 
 data PageContent = PageContent
-  { pcTitle :: [Text]
-  , pcBody :: Text
+  { pcTitle :: [Text],
+    pcBody :: Text
   }
 
 -- page frontmatter title: a list of lines or a single string
@@ -102,7 +104,7 @@ page raw fallback = case parseFrontmatter (TE.decodeUtf8Lenient raw) of
   Just (PageTitle t, body) -> PageContent t body
   Nothing -> PageContent fallback ""
 
-parseFrontmatter :: FromJSON meta => Text -> Maybe (meta, Text)
+parseFrontmatter :: (FromJSON meta) => Text -> Maybe (meta, Text)
 parseFrontmatter t = case T.lines t of
   ("---" : rest) ->
     let (fm, remainder) = break (== "---") rest
@@ -118,7 +120,7 @@ plainListing ps =
     "kio.dev · posts (connect with a terminal for interactive)"
       : ""
       : concatMap entry ps
- where
-  entry p =
-    (postDate p <> "  " <> postTitle p)
-      : maybe [] (\d -> ["          " <> d]) (postDesc p)
+  where
+    entry p =
+      (postDate p <> "  " <> postTitle p)
+        : maybe [] (\d -> ["          " <> d]) (postDesc p)

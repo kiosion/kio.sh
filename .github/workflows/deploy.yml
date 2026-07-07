@@ -3,12 +3,9 @@ name: deploy
 on:
   push:
     branches: ["main"]
-  # fired by kio.dev when src/content changes (content is cloned at build time,
-  # so a fresh deploy is how new posts reach the live site)
   repository_dispatch:
     types: [content-updated]
 
-# never cancel an in-flight deploy; let pushes and content triggers serialize
 concurrency:
   group: deploy
   cancel-in-progress: false

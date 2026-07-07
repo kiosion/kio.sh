@@ -1,11 +1,7 @@
 /* any-to-one NSS module: resolve every username that earlier NSS
  * modules (files) don't recognize onto the local "blog" account, with
  * an empty password field so sshd's "none" auth succeeds and visitors
- * are never prompted. getpwnam and getspnam are implemented (the
- * latter so sshd's shadow lookup succeeds instead of warning per
- * login); uid lookups and enumeration behave normally. The requested
- * name is preserved in pw_name so the TUI can greet the visitor via
- * $USER.
+ * are never prompted
  */
 #include <errno.h>
 #include <nss.h>
@@ -32,18 +28,22 @@ enum nss_status _nss_ato_getpwnam_r(const char *name, struct passwd *result,
     struct passwd tplbuf, *tpl = NULL, *ent = NULL;
     char tplstr[1024];
     FILE *f = fopen("/etc/passwd", "re");
-    if (f == NULL) {
+    if (f == NULL)
+    {
         *errnop = errno;
         return NSS_STATUS_UNAVAIL;
     }
     /* fgetpwent_r: _r entry points must be reentrant */
-    while (fgetpwent_r(f, &tplbuf, tplstr, sizeof(tplstr), &ent) == 0) {
-        if (strcmp(ent->pw_name, "blog") == 0) {
+    while (fgetpwent_r(f, &tplbuf, tplstr, sizeof(tplstr), &ent) == 0)
+    {
+        if (strcmp(ent->pw_name, "blog") == 0)
+        {
             tpl = ent;
             break;
         }
     }
-    if (tpl == NULL) {
+    if (tpl == NULL)
+    {
         fclose(f);
         *errnop = ENOENT;
         return NSS_STATUS_NOTFOUND;
@@ -55,7 +55,8 @@ enum nss_status _nss_ato_getpwnam_r(const char *name, struct passwd *result,
         copy_str("", &result->pw_passwd, &buf, &left) ||
         copy_str("", &result->pw_gecos, &buf, &left) ||
         copy_str(tpl->pw_dir, &result->pw_dir, &buf, &left) ||
-        copy_str(tpl->pw_shell, &result->pw_shell, &buf, &left)) {
+        copy_str(tpl->pw_shell, &result->pw_shell, &buf, &left))
+    {
         fclose(f);
         *errnop = ERANGE;
         return NSS_STATUS_TRYAGAIN;
@@ -66,17 +67,18 @@ enum nss_status _nss_ato_getpwnam_r(const char *name, struct passwd *result,
     return NSS_STATUS_SUCCESS;
 }
 
-/* shadow counterpart: empty password, no aging fields. Same auth
- * outcome as the failed lookup it replaces (sshd fell back to the
- * empty pw_passwd); this just makes the lookup succeed quietly.
- * Only consulted for names "files" doesn't know, same as getpwnam. */
+/* shadow counterpart. Same auth outcome as the failed lookup it
+ * replaces; this just makes it succeed quietly. Only consulted
+ * for names "files" doesn't know, same as getpwnam.
+ */
 enum nss_status _nss_ato_getspnam_r(const char *name, struct spwd *result,
                                     char *buffer, size_t buflen, int *errnop)
 {
     char *buf = buffer;
     size_t left = buflen;
     if (copy_str(name, &result->sp_namp, &buf, &left) ||
-        copy_str("", &result->sp_pwdp, &buf, &left)) {
+        copy_str("", &result->sp_pwdp, &buf, &left))
+    {
         *errnop = ERANGE;
         return NSS_STATUS_TRYAGAIN;
     }

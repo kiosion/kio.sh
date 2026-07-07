@@ -29,9 +29,8 @@ runTui = do
   chan <- newBChan 16
   t0 <- getMonotonicTime
   lastInputRef <- newIORef t0
-  -- Tick drives fx while active (Events.handle stamps lastInputRef on
-  -- every real event); wall-clock timeouts stay enforced even while fx
-  -- ticks are paused. Timings live in Core.
+  -- Tick drives fx while active; wall-clock timeouts stay enforced
+  -- even while fx ticks are paused.
   void . forkIO . forever $ do
     threadDelay tickMicros
     now <- getMonotonicTime
