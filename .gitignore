@@ -1,1 +1,4 @@
 dist-newstyle/
+# pulled from kio.dev at build time (source of truth lives there)
+/content
+/.content-tmp

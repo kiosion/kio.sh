@@ -42,16 +42,18 @@ binary at compile.
 
 ## Dev
 
-Local, no SSH (GHC + cabal via ghcup):
+Local, no SSH (GHC + cabal via ghcup). `make content` pulls the markdown
+from kio.dev (the source of truth) into `./content` for the compile-time
+embed:
 
 ```sh
-cd ssh && cabal run kio-tui
+make content && cabal run kio-tui
 ```
 
-Full container (build from the repo root; the image embeds `src/content`):
+Full container (the image clones `src/content` from kio.dev at build time):
 
 ```sh
-make -C ./ssh dev        # build + run fg on :2222, Ctrl+C to stop
+make dev                 # build + run fg on :2222, Ctrl+C to stop
 ssh localhost -p 2222    # connect
 ```
 

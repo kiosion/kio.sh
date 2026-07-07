@@ -49,7 +49,7 @@ data Post = Post
   }
 
 postFiles :: [(FilePath, ByteString)]
-postFiles = $(embedDir "../src/content/posts")
+postFiles = $(embedDir "content/posts")
 
 allPosts :: [Post]
 allPosts =
@@ -92,10 +92,10 @@ instance FromJSON PageTitle where
     PageTitle <$> (parseJSON v <|> ((: []) <$> parseJSON v))
 
 aboutPage :: PageContent
-aboutPage = page $(embedFile "../src/content/about.md") ["kio.dev"]
+aboutPage = page $(embedFile "content/about.md") ["kio.dev"]
 
 etcPage :: PageContent
-etcPage = page $(embedFile "../src/content/etc.md") ["Et cetera"]
+etcPage = page $(embedFile "content/etc.md") ["Et cetera"]
 
 page :: ByteString -> [Text] -> PageContent
 page raw fallback = case parseFrontmatter (TE.decodeUtf8Lenient raw) of

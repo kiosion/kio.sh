@@ -1,17 +1,24 @@
-# Build from the repo root so compile-time content embedding can see
-# src/content: docker build -f ssh/Dockerfile -t kio-ssh .
+# Build context is the repo root: docker build -t kio-ssh .
 FROM haskell:9.6-slim AS build
-WORKDIR /build/ssh
-COPY ssh/kio-tui.cabal ./
+WORKDIR /build
+COPY kio-tui.cabal ./
 # Best-effort dependency layer so content/code edits don't recompile brick & co.
 RUN cabal update && (cabal build --only-dependencies || true)
-COPY ssh/sshd/nss_ato.c ./
+COPY sshd/nss_ato.c ./
 RUN mkdir -p /out && gcc -shared -fPIC -O2 -o /out/libnss_ato.so.2 nss_ato.c
-COPY src/content /build/src/content
-COPY ssh/logo.txt ./
-COPY ssh/app app
+# Content's source of truth is the kio.dev repo; pull just src/content at build
+# time (sparse, blobless) so publishing a post there needs no change here.
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && git clone --depth 1 --filter=blob:none --sparse \
+       https://github.com/kiosion/kio.dev.git /tmp/kio.dev \
+  && git -C /tmp/kio.dev sparse-checkout set src/content \
+  && cp -a /tmp/kio.dev/src/content content \
+  && rm -rf /tmp/kio.dev
+COPY logo.txt ./
+COPY app app
 # cabal install builds from an sdist copy, which breaks the relative
-# ../src/content embed paths -- build in place instead.
+# content embed paths -- build in place instead.
 RUN cabal build exe:kio-tui && cp "$(cabal list-bin kio-tui)" /out/kio-tui && strip /out/kio-tui
 # Non-tty run prints the plain listing, forcing every post's frontmatter
 # parse -- fails the image build (not a visitor's session) on a bad post.
@@ -30,14 +37,14 @@ RUN apt-get update \
   && passwd -d blog
 COPY --from=build /out/kio-tui /usr/local/bin/kio-tui
 COPY --from=build /out/libnss_ato.so.2 /usr/lib/libnss_ato.so.2
-COPY ssh/sshd/sshd_config /etc/ssh/sshd_config
-COPY ssh/sshd/entrypoint.sh /entrypoint.sh
+COPY sshd/sshd_config /etc/ssh/sshd_config
+COPY sshd/entrypoint.sh /entrypoint.sh
 # landing page for browsers, with the logo injected from its one source
-# and the site's mono font pulled from the main site's assets
-COPY ssh/http/index.html /var/www/index.html
-COPY static/assets/fonts/commit_mono/CommitMono-Regular.woff2 /var/www/CommitMono-Regular.woff2
-COPY static/assets/fonts/commit_mono/CommitMono-Bold.woff2 /var/www/CommitMono-Bold.woff2
-COPY ssh/logo.txt /tmp/logo.txt
+# and the site's mono font served alongside it
+COPY http/index.html /var/www/index.html
+COPY http/fonts/CommitMono-Regular.woff2 /var/www/CommitMono-Regular.woff2
+COPY http/fonts/CommitMono-Bold.woff2 /var/www/CommitMono-Bold.woff2
+COPY logo.txt /tmp/logo.txt
 RUN sed -i -e '/@LOGO@/r /tmp/logo.txt' -e '/@LOGO@/d' /var/www/index.html \
   && rm /tmp/logo.txt \
   # legit crawlers fetch this constantly; a real file beats recurring 404s
