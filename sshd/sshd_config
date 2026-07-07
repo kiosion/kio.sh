@@ -1,0 +1,40 @@
+# Anonymous, read-only SSH entry point for the kio.dev TUI.
+# The real OpenSSH daemon does all protocol/crypto work; the `blog`
+# account exists only to run the TUI binary.
+
+Port 22
+HostKey /etc/ssh/keys/ssh_host_ed25519_key
+
+UsePAM no
+PermitRootLogin no
+
+# Frictionless anonymous access: the ato NSS module maps any unknown
+# username onto the blog account with an empty password, and OpenSSH's
+# "none" auth succeeds for empty passwords -- so any username connects
+# with no password prompt at all.
+PasswordAuthentication yes
+PermitEmptyPasswords yes
+PubkeyAuthentication no
+KbdInteractiveAuthentication no
+
+# No shell, no tunnels, no forwarding -- just the TUI.
+ForceCommand /usr/local/bin/kio-tui
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding no
+PermitTunnel no
+PermitUserRC no
+
+PrintMotd no
+ClientAliveInterval 60
+ClientAliveCountMax 10
+
+# Abuse guards: one session per connection, quick pre-auth reaping,
+# throttle unauthenticated floods globally and per source IP.
+MaxSessions 1
+LoginGraceTime 10
+MaxStartups 10:30:60
+PerSourceMaxStartups 3
+
+# vty needs a UTF-8 locale for box-drawing characters (OpenSSH >= 8.7).
+SetEnv LANG=C.UTF-8

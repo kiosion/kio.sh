@@ -1,0 +1,30 @@
+cabal-version:      3.0
+name:               kio-tui
+version:            0.1.0
+synopsis:           Browse kio.dev posts as a TUI over SSH
+build-type:         Simple
+
+executable kio-tui
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  other-modules:
+    Content
+    Markdown
+    UI
+  default-language: GHC2021
+  ghc-options:      -threaded -O2 -Wall
+  build-depends:
+    , aeson
+    , base          >=4.16
+    , brick         >=2.0
+    , bytestring
+    , cmark
+    , file-embed
+    , microlens
+    , microlens-mtl
+    , mtl
+    , text
+    , vector
+    , vty
+    , vty-crossplatform
+    , yaml
