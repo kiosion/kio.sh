@@ -41,7 +41,7 @@ import Data.Text (Text)
 import Data.Vector qualified as Vec
 import Graphics.Vty qualified as V
 import Lens.Micro (Lens', lens)
-import Markdown (FnJump, markdownAttrs)
+import Markdown (markdownAttrs)
 
 data Tab = HomeTab | ThoughtsTab | EtcTab
   deriving (Eq, Ord, Show)
@@ -69,13 +69,12 @@ data St = St
     stUser :: Maybe Text,
     stTick :: Int,
     stSel :: Tab,
-    stRipple :: Maybe (Int, Int, Int),
+    stRipple :: [(Int, Int, Int)], -- active logo-click ripples (col, row, start tick)
     stBurst :: Maybe (BurstTarget, Int),
     stStatus :: Maybe Text,
     stPrompt :: Maybe Text, -- "/" search prompt buffer while typing
     stQuery :: Maybe (Text, Int), -- committed search query + active hit
     stPing :: Bool, -- apply search scroll request this render
-    stFnJump :: Maybe FnJump, -- footnote scroll request
     stHelp :: Bool, -- "?" keymap overlay showing
     stProgress :: Maybe Int, -- reader scroll percentage
     stMouseHeld :: Bool -- left button down; swallow drag repeats

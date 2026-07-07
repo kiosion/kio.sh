@@ -47,7 +47,7 @@ noise :: Int -> Int -> Int -> Int -> Int
 noise a b t m = (a * 7919 + b * 104729 + t * 31337) `mod` m
 
 -- logo art with per-tick glitch flicker; clicking scrambles a ripple ring
-glitchWidget :: [Text] -> St -> Maybe (Int, Int, Int) -> Widget Name
+glitchWidget :: [Text] -> St -> [(Int, Int, Int)] -> Widget Name
 glitchWidget art s ripple =
   vBox
     [ hBox [withAttr a (txt t) | (a, t) <- row]
@@ -79,20 +79,20 @@ wrapLines w t = case greedyGroups T.length 1 w (T.words t) of
 
 -- deterministic per-cell noise keyed on tick swaps chars and occasionally
 -- runs a cell 'hot'; a click scrambles an expanding ring
-glitchArt :: [Text] -> Int -> Maybe (Int, Int, Int) -> [[(AttrName, Text)]]
-glitchArt art tick ripple =
+glitchArt :: [Text] -> Int -> [(Int, Int, Int)] -> [[(AttrName, Text)]]
+glitchArt art tick ripples =
   [ runs [cell x y c | (x, c) <- zip [0 ..] (T.unpack row)]
   | (y, row) <- zip [0 ..] art
   ]
   where
-    inRipple x y = case ripple of
-      Nothing -> False
-      Just (rx, ry, t0) ->
-        let age = fromIntegral (tick - t0) :: Double
-            dx = fromIntegral (x - rx)
-            dy = fromIntegral (y - ry) * 2 -- char cells are ~2:1
-            d = sqrt (dx * dx + dy * dy)
-         in abs (d - age * 2.2) < 2.2
+    inRipple x y = any onRing ripples
+      where
+        onRing (rx, ry, t0) =
+          let age = fromIntegral (tick - t0) :: Double
+              dx = fromIntegral (x - rx)
+              dy = fromIntegral (y - ry) * 2 -- char cells are ~2:1
+              d = sqrt (dx * dx + dy * dy)
+           in abs (d - age * 2.2) < 2.2
     cell x y c
       | c == ' ' =
           if inRipple x y && hash x y < 25

@@ -59,7 +59,6 @@ rOpts :: St -> RenderOpts Name
 rOpts s =
   RenderOpts
     { roLink = linkify,
-      roJump = stFnJump s,
       roQuery = T.toLower <$> (stPrompt s <|> (fst <$> stQuery s)),
       roHit = maybe 0 snd (stQuery s),
       roPing = stPing s
@@ -131,7 +130,7 @@ topBar s v =
   vBox
     [ padLeftRight 2 $
         hBox
-          [ clickable BrandBtn (hLimit 11 (glitchWidget miniLogoArt s Nothing)),
+          [ clickable BrandBtn (hLimit 11 (glitchWidget miniLogoArt s [])),
             txt "   ",
             vLimit (length miniLogoArt) . C.vCenter . vBox $
               [ brandLine s,

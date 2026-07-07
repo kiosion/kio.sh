@@ -20,8 +20,7 @@ import Data.Text.Encoding qualified as TE
 import GHC.Clock (getMonotonicTime)
 import Graphics.Vty qualified as V
 import Lens.Micro ((^.))
-import Markdown (FnJump (..), siteBase)
-import Text.Read (readMaybe)
+import Markdown (siteBase)
 
 -- lastInputRef feeds the tick thread in UI: it pauses fx ticks on idle
 -- sessions and enforces the idle/session-cap disconnects (TimeUp).
@@ -161,9 +160,6 @@ listSearch q dir = do
     Just j -> listNav (zoom listL (modify (listMoveTo j)))
     Nothing -> pure ()
 
-setJump :: FnJump -> EventM Name St ()
-setJump j = modify (\s -> s {stFnJump = Just j})
-
 actionable :: Name -> Bool
 actionable nm = case nm of
   LogoField -> True
@@ -175,7 +171,8 @@ actionable nm = case nm of
 
 clickOn :: Name -> Int -> Int -> EventM Name St ()
 clickOn nm lc lr = case nm of
-  LogoField -> modify (\st -> st {stRipple = Just (lc, lr, stTick st)})
+  -- ponytail: cap at 12 concurrent ripples; a burst clicker can't outrun the prune
+  LogoField -> modify (\st -> st {stRipple = take 12 ((lc, lr, stTick st) : stRipple st)})
   LinkTo u -> linkAction u
   PostRow i -> zoom listL (modify (listMoveTo i)) >> openSelected
   TabBtn t -> switchTab t
@@ -187,15 +184,11 @@ tick s =
   modify $ \st ->
     st
       { stTick = stTick s + 1,
-        stRipple = case stRipple s of
-          Just (_, _, t0) | stTick s - t0 > rippleFrames -> Nothing
-          r -> r,
+        stRipple = filter (\(_, _, t0) -> stTick s - t0 <= rippleFrames) (stRipple s),
         stBurst = case stBurst s of
           Just (_, t0) | stTick s - t0 > burstFrames -> Nothing
           b -> b,
-        -- scroll requests apply for one render, then release so the
-        -- visitor can scroll freely again
-        stFnJump = Nothing,
+        -- search scroll request applies for one render, then releases
         stPing = False
       }
 
@@ -302,9 +295,6 @@ scrollKeys vp ev = case ev of
 -- status line (& stays OSC 8 clickable in capable terminals)
 linkAction :: Text -> EventM Name St ()
 linkAction u
-  -- "fnref:" before "fn:": the latter prefix matches both.
-  | Just nT <- T.stripPrefix "fnref:" u, Just n <- readInt nT = setJump (JRef n)
-  | Just nT <- T.stripPrefix "fn:" u, Just n <- readInt nT = setJump (JDef n)
   | Just slug <- T.stripPrefix (siteBase <> "/thoughts/") u = openSlug (T.takeWhile (/= '#') slug)
   | u == siteBase || u == siteBase <> "/" = switchTab HomeTab
   | u == siteBase <> "/thoughts" = switchTab ThoughtsTab
@@ -337,9 +327,6 @@ b64 = BC.pack . go . map fromIntegral . BS.unpack
     go [a, b] = let n = a `shiftL` 16 .|. b `shiftL` 8 :: Int in [enc n 18, enc n 12, enc n 6, '=']
     go [a] = let n = a `shiftL` 16 :: Int in [enc n 18, enc n 12, '=', '=']
     go [] = []
-
-readInt :: Text -> Maybe Int
-readInt = readMaybe . T.unpack
 
 openSlug :: Text -> EventM Name St ()
 openSlug slug = case find ((== slug) . postSlug) allPosts of

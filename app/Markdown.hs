@@ -3,7 +3,6 @@
 -- Markdown to brick widgets
 module Markdown
   ( RenderOpts (..),
-    FnJump (..),
     renderMarkdown,
     markdownAttrs,
     headingAttr,
@@ -24,13 +23,8 @@ import Lens.Micro ((^.))
 siteBase :: Text
 siteBase = "https://kio.dev"
 
--- Footnote jump targets; to definition, or back to reference
-data FnJump = JRef Int | JDef Int
-  deriving (Eq)
-
 data RenderOpts n = RenderOpts
   { roLink :: Text -> Widget n -> Widget n,
-    roJump :: Maybe FnJump, -- fn jump targets
     roQuery :: Maybe Text, -- lowercased search query
     roHit :: Int, -- which match to scroll to
     roPing :: Bool -- apply the scroll request this render only
@@ -207,18 +201,13 @@ footnoteWidgets :: (Ord n) => RenderOpts n -> Int -> [(Int, Text)] -> [Widget n]
 footnoteWidgets opts w notes =
   withAttr dimAttr B.hBorder
     : withAttr headingAttr (txt "Footnotes:")
-    : [ maybeVis n $
-          hBox
-            [ roLink opts ("fnref:" <> tshow n) (withAttr linkAttr (txt (tshow n <> "."))),
-              txt " ",
-              indented w 4 (\w' -> blocks opts w' (commonmarkToNode [] t))
-            ]
+    : [ hBox
+          [ withAttr plainAttr (txt (tshow n <> ".")),
+            txt " ",
+            indented w 4 (\w' -> blocks opts w' (commonmarkToNode [] t))
+          ]
       | (n, t) <- notes
       ]
-  where
-    maybeVis n = case roJump opts of
-      Just (JDef m) | m == n -> visible
-      _ -> id
 
 blocks :: (Ord n) => RenderOpts n -> Int -> Node -> Widget n
 blocks opts w (Node _ DOCUMENT ns) = vBox (intersperse blank (map (block opts w) ns))
@@ -308,17 +297,14 @@ inline (Node _ _ ns) = inlines ns
 withUrl :: Maybe Text -> Frag -> Frag
 withUrl u (Frag a _ t) = Frag a u t
 
--- A word containing a footnote sentinel becomes a clickable "(n)".
+-- A word containing a footnote sentinel becomes a link-coloured "(n)".
 fnWord :: Frag -> Frag
 fnWord f@(Frag _ _ w) = case T.breakOn (T.singleton fnA) w of
   (_, "") -> f
   (pre, rest) ->
     let (numT, rest2) = T.breakOn (T.singleton fnB) (T.drop 1 rest)
         post = T.filter (\c -> c /= fnA && c /= fnB) (T.drop 1 rest2)
-     in Frag linkAttr (Just ("fn:" <> numT)) (pre <> "(" <> numT <> ")" <> post)
-
-isFnUrl :: Text -> Bool
-isFnUrl u = T.isPrefixOf "fn:" u || T.isPrefixOf "fnref:" u
+     in Frag linkAttr Nothing (pre <> "(" <> numT <> ")" <> post)
 
 -- Greedy wordwrap over attributed fragments. Splitting on whitespace
 -- collapses runs of spaces inside inline code spans; fine for prose
@@ -333,12 +319,7 @@ wrapFrags opts w frags = vBox (map line (greedyWrap (max 8 w) ws))
           w' = withAttr a' (txt t)
        in case mu of
             Nothing -> w'
-            Just u
-              | isFnUrl u -> jumpVis u (roLink opts u w')
-              | otherwise -> roLink opts u (hyperlink u w')
-    jumpVis u = case roJump opts of
-      Just (JRef n) | u == "fn:" <> tshow n -> visible
-      _ -> id
+            Just u -> roLink opts u (hyperlink u w')
 
 greedyWrap :: Int -> [Frag] -> [[Frag]]
 greedyWrap = greedyGroups (\(Frag _ _ t) -> T.length t) 1
