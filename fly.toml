@@ -1,0 +1,42 @@
+# fly.toml app configuration file for kio-ssh
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'kio-ssh'
+primary_region = 'ewr'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[[mounts]]
+  source = 'ssh_keys'
+  destination = '/etc/ssh/keys'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+[[services]]
+  protocol = 'tcp'
+  # sshd listens on 2222 internally; :22 belongs to Fly's hallpass
+  internal_port = 2222
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 22
+
+  [services.concurrency]
+    type = 'connections'
+    hard_limit = 40
+    soft_limit = 30
+
+  [[services.tcp_checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
