@@ -67,8 +67,7 @@ rOpts s =
 drawLanding :: St -> Widget Name
 drawLanding s =
   vBox
-    [ C.center . clickable LogoField . hLimit logoW $
-        glitchWidget logoArt s (stRipple s),
+    [ heroCanvas s,
       centeredWrap titleAttr heroHead,
       centeredWrap metaAttr (heroRest <> greeting),
       txt " ",
@@ -83,7 +82,29 @@ drawLanding s =
       (hd : rest) -> (hd, T.unwords rest)
       [] -> ("kio.dev", "")
 
--- Centered line that wraps on narrow terminals with each wrapped line
+heroCanvas :: St -> Widget Name
+heroCanvas s =
+  clickable LogoField $
+    Widget Greedy Greedy $ do
+      ctx <- getContext
+      let w = ctx ^. availWidthL
+          h = ctx ^. availHeightL
+      render $ glitchWidget (padArt w h logoArt) s (stRipple s)
+
+-- centre art into a w*h grid of whitespace
+padArt :: Int -> Int -> [Text] -> [Text]
+padArt w h art =
+  take h (replicate top blank <> map row art <> repeat blank)
+  where
+    artW = maximum (1 : map T.length art)
+    top = max 0 ((h - length art) `div` 2)
+    lp = max 0 ((w - artW) `div` 2)
+    blank = T.replicate w " "
+    row r =
+      let r' = T.take w (T.replicate lp " " <> r)
+       in r' <> T.replicate (max 0 (w - T.length r')) " "
+
+-- centred line that wraps on narrow terminals with each wrapped line
 -- individually centered (txtWrap just left-aligns inside its box)
 centeredWrap :: AttrName -> Text -> Widget Name
 centeredWrap a t =

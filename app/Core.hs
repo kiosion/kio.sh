@@ -107,7 +107,7 @@ wheelStep = 3
 
 -- logo click ripple lifetime (ticks)
 rippleFrames :: Int
-rippleFrames = 14
+rippleFrames = 22
 
 -- post-list description truncation (chars)
 descMax :: Int

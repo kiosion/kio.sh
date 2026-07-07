@@ -85,25 +85,38 @@ glitchArt art tick ripples =
   | (y, row) <- zip [0 ..] art
   ]
   where
-    inRipple x y = any onRing ripples
+    -- ring strength at a cell: 0 = none, ~1 = fresh; fades to 0 over frames
+    rippleStrength :: Int -> Int -> Double
+    rippleStrength x y =
+      maximum
+        ( 0
+            : [ 1 - age / life
+              | (rx, ry, t0) <- ripples,
+                let age = fromIntegral (tick - t0)
+                    dx = fromIntegral (x - rx)
+                    dy = fromIntegral (y - ry) * 2 -- char cells are ~2:1
+                    d = sqrt (dx * dx + dy * dy),
+                abs (d - age * 2.2) < 2.2
+              ]
+        )
       where
-        onRing (rx, ry, t0) =
-          let age = fromIntegral (tick - t0) :: Double
-              dx = fromIntegral (x - rx)
-              dy = fromIntegral (y - ry) * 2 -- char cells are ~2:1
-              d = sqrt (dx * dx + dy * dy)
-           in abs (d - age * 2.2) < 2.2
+        life = fromIntegral rippleFrames
     cell x y c
       | c == ' ' =
-          if inRipple x y && hash x y < 25
-            then (logoMidAttr, '·')
-            else (metaAttr, ' ')
+          -- fade quadratically
+          let rs = rippleStrength x y
+              fade = rs * rs
+           in if hash x y < round (30 * fade)
+                then (if rs > 0.5 then logoMidAttr else metaAttr, '·')
+                else (metaAttr, ' ')
       | otherwise =
           let h = hash x y
-              gp = 6 + (if inRipple x y then 55 else 0)
+              rs = rippleStrength x y
+              fade = rs * rs
+              gp = 6 + round (55 * fade)
               c' = if h < gp then glitch !! (h `mod` length glitch) else c
               a
-                | inRipple x y && h < 30 = logoHotAttr
+                | h < round (40 * fade) = logoHotAttr
                 | h < 2 = logoHotAttr
                 | c' `elem` ("@%Pqbd█▛▜▙▟▀▄▌▐▘▝▖▗▚▞" :: String) = logoDenseAttr
                 | c' `elem` ("#*+=" :: String) = logoMidAttr
@@ -114,7 +127,10 @@ glitchArt art tick ripples =
 
 -- group same-attr cells into single txt widgets per run
 runs :: [(AttrName, Char)] -> [(AttrName, Text)]
-runs = map (\g -> (fst (head g), T.pack (map snd g))) . groupBy (\a b -> fst a == fst b)
+runs = map merge . groupBy (\a b -> fst a == fst b)
+  where
+    merge [] = (metaAttr, T.empty)
+    merge grp@((a, _) : _) = (a, T.pack (map snd grp))
 
 -- horizontal rule that drops the occasional stitch
 glitchRule :: Int -> Widget Name

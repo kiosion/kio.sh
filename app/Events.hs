@@ -22,8 +22,8 @@ import Graphics.Vty qualified as V
 import Lens.Micro ((^.))
 import Markdown (siteBase)
 
--- lastInputRef feeds the tick thread in UI: it pauses fx ticks on idle
--- sessions and enforces the idle/session-cap disconnects (TimeUp).
+-- lastInputRef feeds the tick thread in UI. pauses fx ticks on idle
+-- sessions and enforces idle/session-cap disconnects.
 handle :: IORef Double -> BrickEvent Name Tick -> EventM Name St ()
 handle lastInputRef ev = do
   s <- get
@@ -31,8 +31,8 @@ handle lastInputRef ev = do
     AppEvent Tick -> tick s
     AppEvent TimeUp -> halt
     _ -> liftIO (getMonotonicTime >>= writeIORef lastInputRef)
-  -- Latch left-press, clear on release/key; lets the guard below swallow
-  -- the drag repeats terminals send while the button is held.
+  -- Latch left-press, clear on release/key; lets guard below swallow
+  -- drag repeats while held.
   case ev of
     _ | mouseUp ev -> modify (\st -> st {stMouseHeld = False})
     VtyEvent (V.EvKey _ _) -> modify (\st -> st {stMouseHeld = False})
@@ -63,7 +63,7 @@ handle lastInputRef ev = do
       case [e | e@(Extent nm _ _) <- exts, actionable nm] of
         Extent nm (Location (ec, er)) _ : _ -> clickOn nm (c - ec) (r - er)
         [] -> pure ()
-    -- Mouse releases and stray buttons must not reach the key handler.
+    -- Mouse releases and stray buttons shouldn't reach the key handler.
     VtyEvent (V.EvMouseUp _ _ _) -> pure ()
     VtyEvent (V.EvMouseDown _ _ _ _) -> pure ()
     VtyEvent vev -> do
