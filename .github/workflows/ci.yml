@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  # kio.dev fires this when src/content changes (content is cloned at build)
+  repository_dispatch:
+    types: [content-updated]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # supersede in-flight PR runs, but never cancel a deploy mid-flight
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: haskell-actions/run-ormolu@v17
+        with:
+          pattern: app/**/*.hs
+      - uses: haskell-actions/hlint-setup@v2
+      - uses: haskell-actions/hlint-run@v2
+        with:
+          path: app/
+          # advisory only: hlint's warnings/suggestions are nits, not bugs
+          fail-on: error
+
+  # Smoke build on PRs: the Dockerfile's non-tty run parses every post's
+  # frontmatter, so a bad post or compile error fails here before merge.
+  build:
+    needs: lint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          cache-from: type=gha,scope=kio-ssh
+          cache-to: type=gha,scope=kio-ssh,mode=max
+
+  # Deploy on main pushes + content updates. Fly's remote builder rebuilds the
+  # image (pulling the latest content), so this doubles as the build for main.
+  deploy:
+    needs: lint
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

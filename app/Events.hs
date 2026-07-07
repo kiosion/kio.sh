@@ -270,10 +270,12 @@ viewportFor (PageView t) = Just (viewportScroll (PageVP t))
 viewportFor (PostView _) = Just (viewportScroll ReaderVP)
 viewportFor Landing = Nothing
 
+{- HLINT ignore wheel "Avoid lambda using `infix`" -}
 wheel :: View -> Int -> EventM Name St ()
 wheel v d = case v of
   PageView ThoughtsTab -> listNav (zoom listL (modify (listMoveBy (signum d))))
-  _ -> maybe (pure ()) (`vScrollBy` d) (viewportFor v)
+  -- vScrollBy is higher-rank; the point-free section won't typecheck
+  _ -> maybe (pure ()) (\vp -> vScrollBy vp d) (viewportFor v)
 
 scrollVp :: View -> V.Event -> EventM Name St ()
 scrollVp v ev = maybe (pure ()) (`scrollKeys` ev) (viewportFor v)
