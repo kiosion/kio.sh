@@ -4,6 +4,24 @@ version:            0.1.0
 synopsis:           Browse kio.dev posts as a TUI over SSH
 build-type:         Simple
 
+test-suite spec
+  type:             exitcode-stdio-1.0
+  main-is:          Spec.hs
+  hs-source-dirs:   test, app
+  other-modules:    Markdown
+  default-language: GHC2021
+  ghc-options:      -Wall
+  build-depends:
+    , base        >=4.16
+    , brick       >=2.0
+    , cmark
+    , hspec
+    , microlens
+    , QuickCheck
+    , text
+    , vector
+    , vty
+
 executable kio-tui
   main-is:          Main.hs
   hs-source-dirs:   app

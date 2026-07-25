@@ -28,10 +28,26 @@ jobs:
           # advisory only: hlint's warnings/suggestions are nits, not bugs
           fail-on: error
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: haskell-actions/setup@v2
+        with:
+          # match the Dockerfile's haskell:9.6-slim
+          ghc-version: "9.6"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.local/state/cabal/store
+          key: ${{ runner.os }}-cabal-${{ hashFiles('kio-tui.cabal') }}
+          restore-keys: ${{ runner.os }}-cabal-
+      - run: cabal update
+      - run: cabal test all --test-show-details=direct
+
   # Smoke-test on PRs: the Dockerfile's non-tty run parses every post;
   # a bad post or compile error fails here.
   build:
-    needs: lint
+    needs: [lint, test]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -48,7 +64,7 @@ jobs:
   # Deploy on main pushes + content updates. Fly's remote builder rebuilds the
   # image so this doubles as the build for main.
   deploy:
-    needs: lint
+    needs: [lint, test]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:

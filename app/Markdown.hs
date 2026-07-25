@@ -64,7 +64,7 @@ renderMarkdown opts src =
     ctx <- getContext
     let w = ctx ^. availWidthL
         (body, notes) = extractFootnotes src
-        topBlocks = case commonmarkToNode [] body of
+        topBlocks = filter (not . isRawHtml) $ case commonmarkToNode [] body of
           Node _ DOCUMENT ns -> ns
           n -> [n]
         active = activeBlock opts topBlocks
@@ -75,6 +75,15 @@ renderMarkdown opts src =
 
 blank :: Widget n
 blank = txt " "
+
+isRawHtml :: Node -> Bool
+isRawHtml (Node _ (HTML_BLOCK _) _) = True
+isRawHtml (Node _ PARAGRAPH ns) = not (null ns) && all htmlish ns
+  where
+    htmlish (Node _ (HTML_INLINE _) _) = True
+    htmlish (Node _ SOFTBREAK _) = True
+    htmlish _ = False
+isRawHtml _ = False
 
 matchesQuery :: RenderOpts n -> Text -> Bool
 matchesQuery opts t = case roQuery opts of
@@ -121,8 +130,6 @@ isFence = T.isPrefixOf "```" . T.stripStart
 
 -- Pull [^label]: definitions out of the body and replace [^label] refs
 -- with sentinel-wrapped numbers (assigned in order of first reference).
--- Leave lines inside code fences. Sentinels are stripped from the
--- source first so every one downstream is ours.
 extractFootnotes :: Text -> (Text, [(Int, Text)])
 extractFootnotes src = (T.unlines (replaceRefs table bodyLs), numbered <> extra)
   where
@@ -241,7 +248,7 @@ block opts w (Node _ BLOCK_QUOTE ns) =
 block opts w (Node _ (LIST attrs) items) =
   vBox (zipWith (listItem opts w attrs) [listStart attrs ..] items)
 block _ _ (Node _ THEMATIC_BREAK _) = B.hBorder
-block _ _ (Node _ (HTML_BLOCK t) _) = withAttr dimAttr (txt (T.strip t))
+block _ _ (Node _ (HTML_BLOCK _) _) = emptyWidget
 block opts w (Node _ _ ns) = vBox (map (block opts w) ns)
 
 listItem :: (Ord n) => RenderOpts n -> Int -> ListAttributes -> Int -> Node -> Widget n
@@ -292,7 +299,7 @@ inline (Node _ (IMAGE url _) ns) =
   Frag dimAttr Nothing "[image:"
     : map (withUrl (resolveUrl url) . reattr linkAttr) (inlines ns)
       <> (Frag dimAttr Nothing "]" : domainSuffix url)
-inline (Node _ (HTML_INLINE t) _) = [Frag dimAttr Nothing t]
+inline (Node _ (HTML_INLINE _) _) = []
 inline (Node _ _ ns) = inlines ns
 
 withUrl :: Maybe Text -> Frag -> Frag
