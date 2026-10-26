@@ -132,8 +132,13 @@ promptKey s buf k = case k of
             (PageView ThoughtsTab, Just (qq, _)) -> listSearch qq 1
             _ -> pure ()
   V.KBS -> modify (\st -> st {stPrompt = Just (T.dropEnd 1 buf)})
-  V.KChar c -> modify (\st -> st {stPrompt = Just (T.snoc buf c)})
+  V.KChar c
+    | T.length buf < maximumSearchCharacters -> modify (\st -> st {stPrompt = Just (T.snoc buf c)})
+    | otherwise -> pure ()
   _ -> pure ()
+
+maximumSearchCharacters :: Int
+maximumSearchCharacters = 256
 
 openPrompt :: EventM Name St ()
 openPrompt = modify (\s -> s {stPrompt = Just ""})

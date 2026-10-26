@@ -26,16 +26,19 @@ primary_region = 'ewr'
 
   [[services.ports]]
     port = 22
+    handlers = ['proxy_proto']
 
   [services.concurrency]
     type = 'connections'
     hard_limit = 40
     soft_limit = 30
 
-  [[services.tcp_checks]]
-    interval = '30s'
-    timeout = '5s'
-    grace_period = '10s'
+[checks.ssh]
+  type = 'tcp'
+  port = 2224
+  interval = '30s'
+  timeout = '5s'
+  grace_period = '10s'
 
 [[vm]]
   size = 'shared-cpu-1x'

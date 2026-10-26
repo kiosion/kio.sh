@@ -16,5 +16,6 @@ trap 'kill 0' INT TERM
 # static "connect via ssh" page for browsers
 busybox httpd -f -vv -p 8080 -h /var/www -u blog 2>&1 | prefix http &
 
+haproxy -db -f /etc/haproxy/haproxy.cfg 2>&1 | prefix haproxy &
 /usr/sbin/sshd -D -e 2>&1 | prefix sshd &
 wait

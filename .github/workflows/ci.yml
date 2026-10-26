@@ -44,11 +44,8 @@ jobs:
       - run: cabal update
       - run: cabal test all --test-show-details=direct
 
-  # Smoke-test on PRs: the Dockerfile's non-tty run parses every post;
-  # a bad post or compile error fails here.
-  build:
+  integration:
     needs: [lint, test]
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,13 +55,16 @@ jobs:
           context: .
           file: Dockerfile
           push: false
+          load: true
+          tags: kio-ssh:integration
           cache-from: type=gha,scope=kio-ssh
           cache-to: type=gha,scope=kio-ssh,mode=max
+      - run: test/test_ssh_service.sh kio-ssh:integration
 
-  # Deploy on main pushes + content updates. Fly's remote builder rebuilds the
-  # image so this doubles as the build for main.
+  # Deploy on main pushes and content updates after the image passes integration tests.
+  # Fly's remote builder rebuilds the image for deployment.
   deploy:
-    needs: [lint, test]
+    needs: [lint, test, integration]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:

@@ -2,7 +2,8 @@
 
 module Main (main) where
 
-import Content (Post (..), allPosts, plainListing)
+import Content (Post (..), allPosts, contentValidation, plainListing)
+import Control.Exception (evaluate)
 import Data.List (find)
 import Data.Maybe (fromMaybe)
 import Data.Text qualified as T
@@ -14,6 +15,7 @@ import UI (runTui)
 
 main :: IO ()
 main = do
+  _ <- evaluate contentValidation
   user <- fromMaybe "" <$> lookupEnv "USER"
   if user `elem` botNames
     then do

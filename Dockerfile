@@ -31,7 +31,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
   # ncurses-term: terminfo for modern terminals that ncurses-base lacks;
   # busybox serves the static "connect via ssh" page for browsers
-  openssh-server libgmp10 libtinfo6 ncurses-base ncurses-term busybox \
+  openssh-server haproxy libgmp10 libtinfo6 ncurses-base ncurses-term busybox \
   && rm -rf /var/lib/apt/lists/* \
   # ForceCommand runs through user's shell, so it must be a real one
   && useradd -m -s /bin/sh blog \
@@ -39,6 +39,7 @@ RUN apt-get update \
 COPY --from=build /out/kio-tui /usr/local/bin/kio-tui
 COPY --from=build /out/libnss_ato.so.2 /usr/lib/libnss_ato.so.2
 COPY sshd/sshd_config /etc/ssh/sshd_config
+COPY sshd/haproxy.cfg /etc/haproxy/haproxy.cfg
 COPY sshd/entrypoint.sh /entrypoint.sh
 # landing page for browsers.
 COPY http/index.html /var/www/index.html
@@ -55,5 +56,5 @@ RUN chmod +x /entrypoint.sh \
   -e 's/^shadow:.*/shadow:         files ato/' \
   /etc/nsswitch.conf
 VOLUME /etc/ssh/keys
-EXPOSE 2222
+EXPOSE 2222 2224
 CMD ["/entrypoint.sh"]

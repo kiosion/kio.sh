@@ -16,7 +16,7 @@ content:
 # Rebuild and run in the foreground.
 dev: build
 	@trap 'docker rm -f $(NAME)-dev >/dev/null 2>&1' EXIT INT TERM; \
-	docker run --rm --init --name $(NAME)-dev $(LIMITS) -p $(PORT):2222 -p $(HTTP):8080 -v kio-ssh-keys:/etc/ssh/keys $(IMAGE) || true
+	docker run --rm --init --name $(NAME)-dev $(LIMITS) -p $(PORT):2224 -p $(HTTP):8080 -v kio-ssh-keys:/etc/ssh/keys $(IMAGE) || true
 
 build:
 	docker build -f Dockerfile -t $(IMAGE) .
@@ -26,10 +26,10 @@ build:
 LIMITS := --pids-limit 160 --memory 1g --cpus 1.5
 
 run:
-	docker run --rm $(LIMITS) -p $(PORT):2222 -p $(HTTP):8080 -v kio-ssh-keys:/etc/ssh/keys $(IMAGE)
+	docker run --rm $(LIMITS) -p $(PORT):2224 -p $(HTTP):8080 -v kio-ssh-keys:/etc/ssh/keys $(IMAGE)
 
 start:
-	docker run -d --rm --name $(NAME) $(LIMITS) -p $(PORT):2222 -p $(HTTP):8080 -v kio-ssh-keys:/etc/ssh/keys $(IMAGE)
+	docker run -d --rm --name $(NAME) $(LIMITS) -p $(PORT):2224 -p $(HTTP):8080 -v kio-ssh-keys:/etc/ssh/keys $(IMAGE)
 
 stop:
 	docker stop $(NAME)

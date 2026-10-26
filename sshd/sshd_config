@@ -2,10 +2,10 @@
 # The real OpenSSH daemon does all protocol/crypto work; the `blog`
 # account exists only to run the TUI binary.
 
-# Internal port; the edge proxy maps public :22 here. Not 22 itself:
-# Fly's hallpass agent (fly ssh console) must bind :22 on the private
-# IPv6, and sshd holding it crash-loops the machine.
-Port 2222
+# HAProxy receives public connections on 2222 and preserves their source
+# addresses while forwarding accepted connections to this private port.
+Port 2223
+ListenAddress 127.0.0.1
 HostKey /etc/ssh/keys/ssh_host_ed25519_key
 
 UsePAM no
@@ -38,12 +38,12 @@ PrintMotd no
 ClientAliveInterval 60
 ClientAliveCountMax 10
 
-# Abuse guards: one session per connection, quick pre-auth reaping,
-# throttle unauthenticated floods globally and per source IP.
+# Abuse guards: one session per connection and quick pre-auth reaping.
+# HAProxy limits complete connections per source address, including
+# authenticated sessions.
 MaxSessions 1
 LoginGraceTime 10
 MaxStartups 10:30:60
-PerSourceMaxStartups 3
 
 # vty needs a UTF-8 locale for box-drawing characters (OpenSSH >= 8.7).
 SetEnv LANG=C.UTF-8

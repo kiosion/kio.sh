@@ -7,6 +7,7 @@ module Content
     allPosts,
     aboutPage,
     etcPage,
+    contentValidation,
     plainListing,
   )
 where
@@ -97,15 +98,18 @@ instance FromJSON PageTitle where
     PageTitle <$> (parseJSON v <|> ((: []) <$> parseJSON v))
 
 aboutPage :: PageContent
-aboutPage = page $(embedFile "content/about.md") ["kio.dev"]
+aboutPage = page "about.md" $(embedFile "content/about.md")
 
 etcPage :: PageContent
-etcPage = page $(embedFile "content/etc.md") ["Et cetera"]
+etcPage = page "etc.md" $(embedFile "content/etc.md")
 
-page :: ByteString -> [Text] -> PageContent
-page raw fallback = case parseFrontmatter (TE.decodeUtf8Lenient raw) of
+page :: FilePath -> ByteString -> PageContent
+page path raw = case parseFrontmatter (TE.decodeUtf8Lenient raw) of
   Just (PageTitle t, body) -> PageContent t body
-  Nothing -> PageContent fallback ""
+  Nothing -> error ("kio-tui: bad/missing frontmatter in content/" <> path)
+
+contentValidation :: ()
+contentValidation = aboutPage `seq` etcPage `seq` foldr seq () allPosts
 
 parseFrontmatter :: (FromJSON meta) => Text -> Maybe (meta, Text)
 parseFrontmatter t = case T.lines t of

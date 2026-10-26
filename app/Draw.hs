@@ -34,8 +34,9 @@ barRow :: Widget Name -> Text -> Widget Name
 barRow left hint = hBox [left, padLeft Max (mtxt hint)]
 
 draw :: St -> [Widget Name]
-draw s = (if stHelp s then (helpOverlay :) else id) base
+draw s = map limitTerminalDimensions ((if stHelp s then (helpOverlay :) else id) base)
   where
+    limitTerminalDimensions = hLimit maximumTerminalColumns . vLimit maximumTerminalRows
     base = case stView s of
       Landing -> [drawLanding s]
       v -> [vBox [topBar s v, body v, bottomBar s v]]
@@ -53,6 +54,10 @@ draw s = (if stHelp s then (helpOverlay :) else id) base
       pageViewport t (contentPage (rOpts s) (if t == HomeTab then aboutPage else etcPage))
     body (PostView p) = readerBody s p
     body Landing = emptyWidget
+
+maximumTerminalColumns, maximumTerminalRows :: Int
+maximumTerminalColumns = 240
+maximumTerminalRows = 100
 
 -- Markdown render options derived from the current state
 rOpts :: St -> RenderOpts Name
